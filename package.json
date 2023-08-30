@@ -1,0 +1,36 @@
+{
+  "name": "mpeg-v",
+  "version": "2.0.0",
+  "description": "your go-to bot for converting audio into video, tailored specifically for the convenience of discord mobile users.",
+  "main": "dist/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "start": "node .",
+    "dev": "nodemon --config nodemon.json src/index.ts",
+    "undeploy": "cross-env IS_SCRIPT=true ts-node src/scripts/undeploy",
+    "undeploy-prod": "cross-env NODE_ENV=production npm run undeploy",
+    "deploy": "cross-env IS_SCRIPT=true ts-node src/scripts/deploy",
+    "deploy-prod": "cross-env NODE_ENV=production npm run deploy"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^18.17.3",
+    "nodemon": "^2.0.20",
+    "prisma": "^5.1.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^4.8.4"
+  },
+  "dependencies": {
+    "@discordjs/builders": "^1.6.4",
+    "@discordjs/rest": "^1.7.1",
+    "@prisma/client": "^5.1.0",
+    "cpu-stat": "^2.0.1",
+    "cross-env": "^7.0.3",
+    "discord-hybrid-sharding": "^2.1.3",
+    "discord.js": "^14.11.0",
+    "dotenv": "^16.0.3",
+    "os": "^0.1.2"
+  }
+}
