@@ -3,27 +3,27 @@ const ffmpeg = require("child_process");
 export async function render(
   background: string,
   audio: string,
-  output: string
+  output: string,
+  withTitle: boolean = false
 ) {
   return new Promise((resolve) => {
-    const origPeg = `ffmpeg -y -loop 0 -i ${background} -i ${audio} -filter_complex "[1:a]showwaves=s=200x40:mode=point:colors=0x9cf42f:0.1:0.8[v];[1:a]showwaves=s=200x40:mode=line:colors=0xfc7828[v1];[0:v]scale=200:40[bg];[bg][v1]overlay[outv1];[outv1][v]overlay[outv];[outv]fps=30[outv]" -map "[outv]" -map 1:a -c:v libx264 -preset ultrafast -c:a aac -b:a 192k -b:v 200k -pix_fmt yuv420p -shortest ${output}`;
-    const newPegP = `ffmpeg -y -loop 0 -i ${background} -i ${audio} -filter_complex "[1:a]showwaves=s=200x40:mode=point:colors=0x9cf42f:0.1:0.8[v];[1:a]showwaves=s=200x40:mode=line:colors=0xfc7828[v1];[0:v]scale=200:40[bg];[bg][v1]overlay[outv1];[outv1][v]overlay[outv];[outv]fps=30[outv]" -map "[outv]" -map 1:a -c:v libx264 -preset ultrafast -c:a aac -b:a 192k -b:v 400k -pix_fmt yuv420p -shortest ${output}`;
+    const colors = [`0x2b2d31`, `0x9cf42f`, `0xfc7828`];
+    const command = `ffmpeg -y -f lavfi -i color=c=${colors[0]}:s=250x40 -i ${audio} -filter_complex "[1:a]showwaves=s=250x40:mode=point:colors=${colors[1]}:0.1:0.8[v];[1:a]showwaves=s=240x40:mode=line:colors=${colors[2]}[v1];[0:v][v1]overlay[outv1];[outv1][v]overlay[outv];[outv]fps=30[outv]" -map "[outv]" -map 1:a -c:v libx264 -preset ultrafast -c:a aac -b:a 192k -b:v 200k -pix_fmt yuv420p -shortest ${output}`;
 
     try {
+      const startTime = Date.now();
       const ls = ffmpeg
-        .exec(newPegP)
+        .exec(command)
 
         .on("exit", function () {
-          resolve(true);
+          const endTime = Date.now();
+          const timeElapsed = endTime - startTime;
+          resolve(timeElapsed);
         });
 
-      ls.stdout.on("data", function (data: any) {
+      ls.stderr?.on("data", function (data: any) {
         // console.log("stdout: " + data.toString());
-      });
-
-      ls.stderr.on("data", function (data: any) {
-        console.log("stderr: " + data.toString());
-        if (data.toString().toLowerCase().includes("error")) resolve(false);
+        if (data.toString().includes("Error ")) resolve(false);
       });
     } catch (e) {
       console.log(e);

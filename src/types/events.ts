@@ -1,9 +1,11 @@
-import { ClientEvents, Awaitable, Client } from "discord.js";
+import { ClientEvents, Awaitable, Client, APIEmbed } from "discord.js";
 
 type LoggerFunction = (...args: unknown[]) => void;
+type EmbedLoggerFunction = (...args: APIEmbed[]) => void;
 export interface EventProps {
   client: Client;
   log: LoggerFunction;
+  embedLog: EmbedLoggerFunction;
 }
 
 export type EventKeys = keyof ClientEvents;
