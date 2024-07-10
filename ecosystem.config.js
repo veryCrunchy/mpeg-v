@@ -3,7 +3,10 @@ module.exports = {
   apps: [
     {
       name: "MPEG-V2",
-      script: "dist/index.js",
+      script: "src/index.ts",
+      interpreter: "node",
+      interpreter_args: "--import tsx",
+
       watch: true,
       watch_delay: 6000,
       log_date_format: "YYYY-MM-DD HH:mm Z",
