@@ -10,7 +10,7 @@ module.exports = {
       watch: true,
       watch_delay: 6000,
       log_date_format: "YYYY-MM-DD HH:mm Z",
-      ignore_watch: ["node_modules", "assets"],
+      ignore_watch: ["node_modules", "assets", ".git"],
     },
   ],
 };
