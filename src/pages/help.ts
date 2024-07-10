@@ -80,7 +80,7 @@ export function getCategoryPage(
     // Pre-map all commands as embed fields
     const commands: APIEmbedField[] = c.commands.map((c) => ({
       name: c.meta.name,
-      value: c.meta.description,
+      value: c.meta.description ?? "eee",
     }));
 
     return {

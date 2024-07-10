@@ -12,4 +12,5 @@ export interface Keys {
   };
   dirname: string;
   NODE_ENV: string;
+  id?: string;
 }

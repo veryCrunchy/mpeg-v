@@ -29,6 +29,7 @@ const client: Client = new Client({
     },
   }),
 });
+keys.id = client.user?.id;
 registerEvents(client, events);
 client.login(keys.clientToken).catch((err) => {
   console.error("[Login Error]", err);

@@ -1,7 +1,4 @@
-import { config } from 'dotenv'
-import { resolve } from 'path'
-
-config({ path: resolve(__dirname, '..', '..', '.env') })
+import 'dotenv/config'
 
 import { REST, Routes, APIUser } from 'discord.js'
 import commands from '../commands'
@@ -20,8 +17,8 @@ async function main() {
     ? Routes.applicationCommands(currentUser.id)
     : Routes.applicationGuildCommands(currentUser.id, keys.testGuild)
 
-  await rest.put(endpoint, { body })
-
+ const res = await rest.put(endpoint, { body })
+console.log(res)
   return currentUser
 }
 
