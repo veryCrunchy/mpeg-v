@@ -49,7 +49,7 @@ export async function generateVideo(
           );
           let done = await render(
             filepath,
-            path.join(keys.dirname, `assets/temp/out/${attachment.id}.webm`),
+            path.join(keys.dirname, `assets/temp/out/${attachment.id}.mp4`),
           );
           if (done !== false) {
             log(
@@ -64,10 +64,10 @@ export async function generateVideo(
                   : undefined,
               files: [
                 {
-                  name: `${attachment.name}.webm`,
+                  name: `${attachment.name}.mp4`,
                   attachment: path.join(
                     keys.dirname,
-                    `assets/temp/out/${attachment.id}.webm`
+                    `assets/temp/out/${attachment.id}.mp4`
                   ),
                 },
               ],
@@ -89,7 +89,7 @@ export async function generateVideo(
 
       setTimeout(() => {
         fs.unlink(
-          path.join(keys.dirname, `assets/temp/out/${attachment.id}.webm`),
+          path.join(keys.dirname, `assets/temp/out/${attachment.id}.mp4`),
           (err) => {
             if (err) {
               console.error(err);
