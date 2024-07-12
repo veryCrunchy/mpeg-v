@@ -13,10 +13,10 @@ export async function render(audio: string, output: string) {
     [0:v][v1]overlay[outv1];[outv1][v]overlay[outv];[outv]fps=15[outv]"\
     -map "[outv]"\
     -map 1:a\
-    -c:v libvpx-vp9 \
-    -pix_fmt yuva420p\
+    -c:v libx264\
+    -pix_fmt yuv420p\
     -preset ultrafast\
-    -c:a libvorbis \
+    -c:a aac \
     -b:a 192k\
     -shortest\
     ${output}`;
