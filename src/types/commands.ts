@@ -18,16 +18,15 @@ export interface CommandProps {
 }
 
 export class ExtendedContextMenuCommandBuilder extends ContextMenuCommandBuilder {
-  // Add the description field
   private _description?: string;
+  public integration_types = [0, 1];
+  public contexts = [0, 1, 2];
 
-  // Method to set the description
   setDescription(description: string): this {
     this._description = description;
     return this;
   }
 
-  // Method to get the description (optional)
   get description(): string | undefined {
     return this._description;
   }
