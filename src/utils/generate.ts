@@ -3,7 +3,7 @@ import {
   Message,
   MessageContextMenuCommandInteraction,
 } from "discord.js";
-import { render, MessageReply, EditReply, Reply } from "../utils";
+import { render, MessageReply, EditReply, Reply, getSize } from "../utils";
 import * as fs from "fs";
 import https from "https";
 import path from "path";
@@ -15,14 +15,11 @@ export async function generateVideo(
   client: Client,
   interaction?: MessageContextMenuCommandInteraction
 ) {
-  if (
-    message.flags.bitfield == 8192 ||
-    (message.attachments.size == 0 && message.reference == null)
-  )
-    return;
+  if (message.flags.bitfield == 8192 && !interaction) return;
   let attachments = message.attachments;
   let messageRef = message.url;
   if (
+    message.attachments.size == 0 &&
     message.reference !== null &&
     message.content.trim() == `<@${client.user?.id}>` &&
     message.reference.messageId !== undefined
@@ -33,6 +30,8 @@ export async function generateVideo(
       messageRef = m.url;
     }
   }
+  if (interaction && message.attachments.size == 0)
+    return Error("No audio files found.");
   for (const messageAttachment of attachments) {
     const attachment = messageAttachment[1];
     const extension = attachment.name.split(".").pop();
@@ -41,22 +40,31 @@ export async function generateVideo(
       let filepath = `assets/temp/in/${attachment.id}-${attachment.name}`;
       let file = fs.createWriteStream(filepath);
       https.get(attachment.url, function (response) {
+        const outputFile = `assets/temp/out/${attachment.id}.mp4`;
+        //@ts-ignore
         response.pipe(file);
         file.on("finish", async () => {
           file.close();
           log(
-            `started \`${attachment.name}\` :: \`${message.guild?.name}\` : \`${message.guild?.id}\``
+            `started \`${attachment.name}\` :: \`${
+              message.guild?.name ?? message.author.username
+            }\` : \`${message.guild?.id ?? message.author.id}\``
           );
           let done = await render(
             filepath,
-            path.join(keys.dirname, `assets/temp/out/${attachment.id}.mp4`),
+            path.join(keys.dirname, outputFile)
           );
           if (done !== false) {
+            const size = getSize(outputFile);
             log(
-              `\`${(done as number) / 1000}sec\` :: \`${
+              `\`${(done as number) / 1000}sec\` :: \`${size}kb\` :: \`${
                 attachment.name
-              }\` :: \`${message.guild?.name}\` : \`${message.guild?.id}\``
+              }\` :: \`${
+                message.guild?.name ?? message.author.username
+              }\` : \`${message.guild?.id ?? message.author.id}\``
             );
+            if (size > 25000)
+              return Error(`Output file size too large; ${size}/25000kb`);
             const msg = {
               content:
                 attachments.size > 1 || interaction
@@ -65,24 +73,14 @@ export async function generateVideo(
               files: [
                 {
                   name: `${attachment.name}.mp4`,
-                  attachment: path.join(
-                    keys.dirname,
-                    `assets/temp/out/${attachment.id}.mp4`
-                  ),
+                  attachment: path.join(keys.dirname, outputFile),
                 },
               ],
             };
             if (interaction) interaction.followUp(msg);
             else message.reply(msg);
           } else {
-            interaction
-              ? interaction?.reply(
-                  Reply.error("Something went wrong..\nPlease try again.")
-                )
-              : MessageReply.TempError(
-                  message,
-                  "Something went wrong..\nPlease try again."
-                );
+            Error("Something went wrong whilst generating video");
           }
         });
       });
@@ -105,5 +103,11 @@ export async function generateVideo(
         });
       }, 80000);
     }
+  }
+  function Error(e?: string) {
+    let EMessage = e ?? "Something went wrong..\nPlease try again.";
+    interaction
+      ? Reply.TempError(interaction, EMessage)
+      : MessageReply.TempError(message, EMessage);
   }
 }
