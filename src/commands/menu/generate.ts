@@ -5,14 +5,24 @@ import {
 import { command, generateVideo } from "../../utils";
 import { CommandMeta, ExtendedContextMenuCommandBuilder } from "../../types";
 
-const data: CommandMeta = new ExtendedContextMenuCommandBuilder()
+const data1: CommandMeta = new ExtendedContextMenuCommandBuilder()
   .setName("Generate Video")
-  .setDescription("Generates a video from all audio files in that message.")
+  .setDescription("Generates a video for all audio files in that message.")
   .setType(ApplicationCommandType.Message);
-data.integration_types = [0, 1];
-data.contexts = [0, 1, 2];
-export default command(data, async ({ interaction, log, client }) => {
-  interaction = interaction as MessageContextMenuCommandInteraction;
-  await interaction.deferReply();
-  generateVideo(interaction.targetMessage, log, client, interaction);
-});
+const data2: CommandMeta = new ExtendedContextMenuCommandBuilder()
+  .setName("Generate Video (Private)")
+  .setDescription("Generates a video for all audio files in that message and sends it ephemerally.")
+  .setType(ApplicationCommandType.Message);
+
+export default [
+  command(data1, async ({ interaction, log, client }) => {
+    interaction = interaction as MessageContextMenuCommandInteraction;
+    await interaction.deferReply();
+    generateVideo(interaction.targetMessage, log, client, interaction);
+  }),
+  command(data2, async ({ interaction, log, client }) => {
+    interaction = interaction as MessageContextMenuCommandInteraction;
+    await interaction.deferReply({ ephemeral: true });
+    generateVideo(interaction.targetMessage, log, client, interaction);
+  }),
+];
