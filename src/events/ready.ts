@@ -19,13 +19,13 @@ const ready = event("ready", async ({ log }, client) => {
     console.log(" [antiCrash] :: Uncaught Exception/Catch (MONITOR)");
     console.log(err.stack);
   });
-
+  
   if (keys.uptimePushUrl !== "null") {
     const url = new URL(keys.uptimePushUrl);
-    url.searchParams.set("ping", client.ws.ping.toString());
-    url.searchParams.set("msg ", client.guilds.cache.size.toString());
     fetch(url);
     setInterval(() => {
+      url.searchParams.set("ping", client.ws.ping.toString());
+      url.searchParams.set("msg", client.guilds.cache.size.toString());
       fetch(url);
     }, 30000);
   }
