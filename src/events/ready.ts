@@ -21,6 +21,7 @@ const ready = event("ready", async ({ log }, client) => {
   });
 
   if (keys.uptimePushUrl !== "null")
+    fetch(keys.uptimePushUrl)
     setInterval(() => {
       fetch(keys.uptimePushUrl)
     }, 60000)
