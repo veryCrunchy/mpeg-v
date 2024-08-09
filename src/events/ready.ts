@@ -23,7 +23,7 @@ const ready = event("ready", async ({ log }, client) => {
   if (keys.uptimePushUrl !== "null")
     setInterval(() => {
       fetch(keys.uptimePushUrl)
-    })
+    }, 60000)
 
   log(`Logged in as ${client.user.tag}`);
   // let filepath = `src/temp/in/1137755613556916324-1sec.mp3`;
