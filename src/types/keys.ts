@@ -5,6 +5,7 @@ export interface Keys {
   topggToken: string;
   testGuild: string;
   logChannel: string;
+  uptimePushUrl: string;
   audioLogChannel: string;
   color: {
     primary: HexColorString;

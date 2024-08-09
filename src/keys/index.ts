@@ -5,6 +5,7 @@ const keys: Keys = {
   topggToken: process.env.TOPGG_TOKEN ?? "null",
   testGuild: process.env.TEST_GUILD ?? "null",
   logChannel: process.env.LOG_CHANNEL ?? "null",
+  uptimePushUrl: process.env.UPTIME_PUSH ?? "null",
   audioLogChannel: process.env.AUDIO_LOG_CHANNEL ?? "null",
   color: {
     primary: "#f77627",

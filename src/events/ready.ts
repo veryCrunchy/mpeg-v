@@ -5,7 +5,7 @@ const process = require("node:process");
 import * as fs from "fs";
 const path = require("path");
 const ready = event("ready", async ({ log }, client) => {
-  process.send = process.send || function () {};
+  process.send = process.send || function () { };
   process.send("ready");
   process.on("unhandledRejection", (reason: Error) => {
     console.log(" [antiCrash] :: Unhandled Rejection/Catch");
@@ -19,6 +19,11 @@ const ready = event("ready", async ({ log }, client) => {
     console.log(" [antiCrash] :: Uncaught Exception/Catch (MONITOR)");
     console.log(err.stack);
   });
+
+  if (keys.uptimePushUrl !== "null")
+    setInterval(() => {
+      fetch(keys.uptimePushUrl)
+    })
 
   log(`Logged in as ${client.user.tag}`);
   // let filepath = `src/temp/in/1137755613556916324-1sec.mp3`;
@@ -56,11 +61,10 @@ const onJoin = event("guildCreate", async ({ client, embedLog }, guild) => {
     },
     color: 9433951,
     footer: {
-      text: `${owner.displayName}${
-        owner.user.username !== owner.displayName.toLowerCase()
+      text: `${owner.displayName}${owner.user.username !== owner.displayName.toLowerCase()
           ? ` :: ${owner.user.username}`
           : ""
-      } :: ${owner.id}`,
+        } :: ${owner.id}`,
       icon_url: userIcon,
     },
   });
