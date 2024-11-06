@@ -1,6 +1,6 @@
 import { Event, EventExec, EventKeys } from "../types";
 import keys from "../keys";
-import { APIEmbed, Client, TextBasedChannel } from "discord.js";
+import { APIEmbed, Client, TextChannel } from "discord.js";
 
 export function event<T extends EventKeys>(
   id: T,
@@ -20,14 +20,22 @@ export function registerEvents(client: Client, events: Event<any>[]): void {
         client,
         log: (...args: unknown[]) => {
           console.log(`[${event.id}]`, ...args);
-          const channel = client.channels.cache.get(keys.logChannel);
-          (channel as TextBasedChannel).send(
-            `[${event.id}] ${args.join(", ")}`
+          client.shard?.broadcastEval((c, ctx) =>
+            (c.channels.cache.get(ctx.channel) as TextChannel).send(
+              `[${ctx.eventID}] ${ctx.args.join(", ")}`
+            ), {
+            context: { channel: keys.logChannel, eventID: event.id, args }
+          }
           );
         },
         embedLog: (...args: APIEmbed[]) => {
-          const channel = client.channels.cache.get(keys.logChannel);            
-          (channel as TextBasedChannel).send({ embeds: args });
+          client.shard?.broadcastEval((c, ctx) =>
+            (c.channels.cache.get(ctx.channel) as TextChannel).send(
+              { embeds: args }
+            ), {
+            context: { channel: keys.logChannel, args }
+          }
+          );
         },
       };
 
