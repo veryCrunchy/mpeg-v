@@ -5,9 +5,9 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc",
-    "start": "tsx src/index.ts",
+    "start": "node  dist/index.js",
     "setup": "pnpx mkdirp assets/temp/in && npx mkdirp assets/temp/out",
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsc --watch & node --watch dist/index.js",
     "undeploy": "cross-env IS_SCRIPT=true tsx src/scripts/undeploy",
     "undeploy-prod": "cross-env NODE_ENV=production npm run undeploy",
     "deploy": "cross-env IS_SCRIPT=true tsx src/scripts/deploy",
@@ -16,6 +16,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@total-typescript/tsconfig": "^1.0.4",
     "@types/node": "^18.19.39",
     "nodemon": "^2.0.22",
     "tsx": "^4.16.2",

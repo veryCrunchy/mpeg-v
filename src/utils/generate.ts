@@ -82,26 +82,26 @@ export async function generateVideo(
           } else {
             Error("Something went wrong whilst generating video");
           }
+
+          setTimeout(() => {
+            fs.unlink(
+              path.join(keys.dirname, `assets/temp/out/${attachment.id}.mp4`),
+              (err) => {
+                if (err) {
+                  console.error(err);
+                  return;
+                }
+              }
+            );
+            fs.unlink(path.join(keys.dirname, filepath), (err) => {
+              if (err) {
+                console.error(err);
+                return;
+              }
+            });
+          }, 80000);
         });
       });
-
-      setTimeout(() => {
-        fs.unlink(
-          path.join(keys.dirname, `assets/temp/out/${attachment.id}.mp4`),
-          (err) => {
-            if (err) {
-              console.error(err);
-              return;
-            }
-          }
-        );
-        fs.unlink(path.join(keys.dirname, filepath), (err) => {
-          if (err) {
-            console.error(err);
-            return;
-          }
-        });
-      }, 80000);
     }
   }
   function Error(e?: string) {

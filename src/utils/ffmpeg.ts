@@ -12,7 +12,6 @@ export async function render(audio: string, output: string) {
       getDuration(audio),
       extension
     );
-    console.log(bitrate);
 
     // Generate the ffmpeg command
     const command = `ffmpeg -y -f lavfi -i \
@@ -41,7 +40,7 @@ export async function render(audio: string, output: string) {
       });
 
       ls.stderr?.on("data", function (data: any) {
-        console.log("stdout: " + data.toString());
+        // console.log("stdout: " + data.toString());
         if (data.toString().includes("Error ")) resolve(false);
         if (data.toString().includes("Conversion failed!")) resolve(false);
       });

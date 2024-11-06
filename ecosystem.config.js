@@ -3,9 +3,9 @@ module.exports = {
   apps: [
     {
       name: "MPEG-V2",
-      script: "src/index.ts",
-      interpreter: "node",
-      interpreter_args: "--import tsx",
+      script: "node dist/index.js",
+      // interpreter: "node",
+      // interpreter_args: "--import tsx",
 
       watch: true,
       watch_delay: 6000,
