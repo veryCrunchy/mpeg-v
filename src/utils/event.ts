@@ -20,10 +20,12 @@ export function registerEvents(client: Client, events: Event<any>[]): void {
         client,
         log: (...args: unknown[]) => {
           console.log(`[${event.id}]`, ...args);
-          client.shard?.broadcastEval((c, ctx) =>
-            (c.channels.cache.get(ctx.channel) as TextChannel).send(
+          client.shard?.broadcastEval((c, ctx) => {
+            const channel = (c.channels.cache.get(ctx.channel))
+            if (channel) (channel as TextChannel).send(
               `[${ctx.eventID}] ${ctx.args.join(", ")}`
-            ), {
+            )
+          }, {
             context: { channel: keys.logChannel, eventID: event.id, args }
           }
           );
@@ -32,7 +34,7 @@ export function registerEvents(client: Client, events: Event<any>[]): void {
           client.shard?.broadcastEval((c, ctx) => {
             const channel = (c.channels.cache.get(ctx.channel))
             if (channel) (channel as TextChannel).send(
-              { embeds: args }
+              { embeds: ctx.args }
             )
           }, {
             context: { channel: keys.logChannel, args }
