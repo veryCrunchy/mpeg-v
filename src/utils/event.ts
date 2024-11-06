@@ -30,7 +30,7 @@ export function registerEvents(client: Client, events: Event<any>[]): void {
         },
         embedLog: (...args: APIEmbed[]) => {
           client.shard?.broadcastEval((c, ctx) =>
-            (c.channels.cache.get(ctx.channel) as TextChannel).send(
+            (c.channels.cache.get(ctx.channel) as TextChannel)?.send(
               { embeds: args }
             ), {
             context: { channel: keys.logChannel, args }
