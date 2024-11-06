@@ -4,6 +4,6 @@
     "verbatimModuleSyntax": false,
     "outDir": "dist"
   },
-  "include": ["./src/index.ts"],
+  "include": ["src"],
   "exclude": ["node_modules"]
 }
