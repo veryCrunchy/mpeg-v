@@ -3,7 +3,6 @@ import { Command } from "../../types";
 import { EditReply, event, Reply } from "../../utils";
 
 const allCommands = commands.map(({ commands }) => commands).flat();
-console.log(allCommands)
 const allCommandsMap = new Map<string, Command>(
   allCommands.map((c) => [c.meta.name, c])
 );
