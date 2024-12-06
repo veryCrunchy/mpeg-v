@@ -12,7 +12,7 @@ export default event('interactionCreate', async (
   const [namespace] = readId(interaction.customId)
 
   // If namespace not in help pages stop
-  if (!Object.values(Namespaces).includes(namespace)) return
+  if (!namespace || !Object.values(Namespaces).includes(namespace)) return
 
   try {
     // Defer update
