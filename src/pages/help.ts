@@ -96,7 +96,7 @@ export function getCategoryPage(
     );
 
   // Get current offset
-  let offset = parseInt(currentOffset ?? "0");
+  let offset = parseInt(currentOffset);
   // if is NaN set offset to 0
   if (isNaN(offset)) offset = 0;
   // Increment offset according to action
