@@ -9,6 +9,9 @@ import https from "https";
 import path from "path";
 import { LoggerFunction } from "../types";
 import keys from "../keys";
+
+const ALLOWED_EXTENSIONS = ["mp3", "aac", "wav", "flac", "m4a", "ogg"];
+
 export async function generateVideo(
   message: Message,
   log: LoggerFunction,
@@ -36,7 +39,7 @@ export async function generateVideo(
     const attachment = messageAttachment[1];
     const extension = attachment.name.split(".").pop();
     if (!extension) return;
-    if (["mp3", "aac", "wav", "flac", "m4a", "ogg"].includes(extension)) {
+    if (ALLOWED_EXTENSIONS.includes(extension)) {
       let filepath = `assets/temp/in/${attachment.id}-${attachment.name}`;
       let file = fs.createWriteStream(filepath);
       https.get(attachment.url, function (response) {
@@ -68,7 +71,7 @@ export async function generateVideo(
             const msg = {
               content:
                 attachments.size > 1 || interaction
-                  ? `[\`\`${attachment.name}\`\`](${messageRef}) ${messageRef}`
+                  ? `[\`\`${attachment.name}\`\`](${messageRef}) ${messageRef}\n-# Completed in ${(done as number) / 1000} seconds`
                   : undefined,
               files: [
                 {
@@ -102,6 +105,8 @@ export async function generateVideo(
           }, 80000);
         });
       });
+    } else {
+      if(interaction) return Error(`Unsupported file type, must be one of the following types:\n\`${ALLOWED_EXTENSIONS.join(", ")}\``);
     }
   }
   function Error(e?: string) {

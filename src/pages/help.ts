@@ -111,9 +111,11 @@ export function getCategoryPage(
   const embed = new EmbedBuilder()
     .setTitle(`${emoji}${category.name} Commands`)
     .setDescription(category.description ?? defaultDescription)
-    .setFields(category.commands[offset])
     .setFooter({ text: `${offset + 1} / ${category.commands.length}` })
     .setColor(keys.color.primary);
+
+  const fields = category.commands[offset];
+  if(fields) embed.addFields(fields); // Ensure offset is within bounds
 
   // Back button
   const backId = createId(N.action, category.name, A.back, offset);
