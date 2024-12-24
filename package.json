@@ -5,7 +5,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "setup": "pnpx mkdirp assets/temp/in && npx mkdirp assets/temp/out",
+    "setup": "npx mkdirp assets/temp/in && npx mkdirp assets/temp/out",
     "dev": "ts-node src/index.ts",
     "undeploy": "cross-env IS_SCRIPT=true tsx src/scripts/undeploy",
     "undeploy-prod": "cross-env NODE_ENV=production npm run undeploy",
