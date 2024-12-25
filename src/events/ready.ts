@@ -19,7 +19,7 @@ const ready = event("ready", async ({ log }, client) => {
     console.log(" [antiCrash] :: Uncaught Exception/Catch (MONITOR)");
     console.log(err.stack);
   });
-  
+
   if (keys.uptimePushUrl !== "null") {
     const url = new URL(keys.uptimePushUrl);
     fetch(url);
@@ -53,6 +53,21 @@ const ready = event("ready", async ({ log }, client) => {
 });
 const onJoin = event("guildCreate", async ({ client, embedLog }, guild) => {
   const owner = await guild.fetchOwner();
+  fetch(process.env.API + "/items/science_installs", {
+    method: "post",
+    headers: {
+      Authorization: `Bearer ${process.env.API_TOKEN}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+
+    body: JSON.stringify({
+      guild_id: guild.id,
+      user_id: owner.id,
+      is_user: false,
+      is_install: true,
+    }),
+  });
   let guildIcon;
   let userIcon;
   if (guild.iconURL() !== null) guildIcon = guild.iconURL() as string;
@@ -74,5 +89,24 @@ const onJoin = event("guildCreate", async ({ client, embedLog }, guild) => {
     },
   });
 });
+const onLeave = event("guildDelete", async ({ client, embedLog }, guild) => {
+  if (!guild.available) return;
+  fetch(process.env.API + "/items/science_installs", {
+    method: "post",
+    headers: {
+      Authorization: `Bearer ${process.env.API_TOKEN}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
 
-export default [ready, onJoin];
+    body: JSON.stringify({
+      guild_id: guild.id,
+      user_id: guild.ownerId,
+      is_user: false,
+      is_install: false,
+    }),
+  });
+
+});
+
+export default [ready, onJoin, onLeave];
