@@ -1,0 +1,20 @@
+{
+  "folders": [
+    {
+      "name": "bot",
+      "path": "apps/bot"
+    },
+    {
+      "name": "serve",
+      "path": "apps/serve"
+    },
+    {
+      "name": "web",
+      "path": "apps/web"
+    }
+  ],
+  "settings": {
+    "editor.tabSize": 2,
+    "editor.formatOnSave": true
+  }
+}
