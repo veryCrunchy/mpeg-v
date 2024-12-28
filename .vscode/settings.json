@@ -1,0 +1,9 @@
+{
+  "cSpell.words": ["unguild"],
+  "editor.tabSize": 2,
+  "editor.formatOnSave": true,
+  "files.exclude": {
+    "**/.git": true,
+    "**/.vscode": true
+  }
+}
