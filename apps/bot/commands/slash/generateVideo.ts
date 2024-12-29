@@ -6,28 +6,29 @@ import {
   createBooleanOption,
   Declare,
   Options,
+  SubCommand,
 } from "seyfert";
 import { embed } from "utils/embed.ts";
 import { ALLOWED_EXTENSIONS } from "utils/general.ts";
 
 const options = {
   file: createAttachmentOption({
-    description: "The audio file you want to convert",
+    description: `The audio file to convert [${ALLOWED_EXTENSIONS.join(", ")}]`,
     required: true,
   }),
-  ephemeral: createBooleanOption({
-    description: "If you want the message to be visible to others",
+  private: createBooleanOption({
+    description: "If you don't want the message to be visible to others",
     required: false,
   }),
 };
-
 @Declare({
-  name: "generate-video",
+  name: "video",
   description: "Generate a video from an audio file",
   integrationTypes: ["GuildInstall", "UserInstall"],
 })
 @Options(options)
-export default class PingCommand extends Command {
+// @Group("generate")
+class Video extends SubCommand {
   override async run(ctx: CommandContext<typeof options>) {
     const audio = ctx.options.file;
 
@@ -46,8 +47,7 @@ export default class PingCommand extends Command {
       });
     }
 
-    const ephemeral = ctx.options.ephemeral ?? false;
-    await ctx.deferReply(ephemeral);
+    await ctx.deferReply(!!ctx.options.private);
 
     const res = await fetch(Deno.env.get("STREAM") + "/generate", {
       headers: {
@@ -92,3 +92,10 @@ export default class PingCommand extends Command {
     });
   }
 }
+
+@Declare({
+  name: "generate",
+  description: "Generate ...",
+})
+@Options([Video])
+export default class ParentCommand extends Command {}
