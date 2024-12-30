@@ -1,7 +1,6 @@
 {
   "workspace": [
-    "./apps/bot",
-    "./apps/serve",
+    "./apps/*",
     "./apps/mpeg-v/utils",
     "./apps/mpeg-v/types"
   ]
