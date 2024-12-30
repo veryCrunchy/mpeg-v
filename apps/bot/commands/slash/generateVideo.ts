@@ -10,6 +10,7 @@ import {
 } from "seyfert";
 import { embed } from "utils/embed.ts";
 import { ALLOWED_EXTENSIONS } from "utils/general.ts";
+import { GenerateVideoRequest } from "@mpeg-v/types";
 
 const options = {
   file: createAttachmentOption({
@@ -48,19 +49,24 @@ class Video extends SubCommand {
     }
 
     await ctx.deferReply(!!ctx.options.private);
-
+    const data: GenerateVideoRequest = {
+      url: audio.url,
+      logs: {
+        user_id: ctx.author.id,
+        guild_id: ctx.guildId ?? null,
+        date_created: ctx.interaction.createdAt,
+        type: "slash",
+        audio_format: extension,
+        file_name: audio.filename,
+      },
+    };
     const res = await fetch(Deno.env.get("STREAM") + "/generate", {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${Deno.env.get("API_TOKEN")}`,
       },
       method: "POST",
-      body: JSON.stringify({
-        url: audio.url,
-        logs: {
-          date: ctx.interaction.createdAt,
-        },
-      }),
+      body: JSON.stringify(data),
     });
 
     if (!res.ok) {

@@ -2,31 +2,17 @@
 import ffmpeg from "npm:fluent-ffmpeg";
 import { Readable, Writable } from "node:stream";
 import { Buffer } from "node:buffer";
-import { createItem } from "./cms.ts";
-interface Logs {
-  date_created: string;
-  file_name: string;
-  type: string;
-  conversion_time: number;
-  input_size: number;
-  output_size: number;
-  file_duration: number;
-  input_bitrate: number;
-  output_bitrate: number;
-  audio_format: string;
-  user_id: string;
-  guild_id: string;
-  cached: boolean;
-}
+import { createItem } from "@mpeg-v/utils";
+import { ServeItem, ConversionLogs, GenerateVideoRequest } from "@mpeg-v/types";
 export default async (req: Request): Promise<Response> => {
   const start = Date.now();
 
   const colors = [`0x1e1f22`, `0x9cf42f`, `0xfc7828`];
   const [width, height] = [250, 100];
   // const bitrate = "320";
-  const json: { file: string; logs: Logs } = await req.json();
-  if (!json.file) return new Response(null, { status: 400 });
-  const file = await fetch(json.file);
+  const json: GenerateVideoRequest = await req.json();
+  if (!json.url) return new Response(null, { status: 400 });
+  const file = await fetch(json.url);
   console.log("Before file", Date.now() - start);
   if (!file.ok || !file.body) {
     throw new Error(`Failed to fetch video: ${file.statusText}`);
@@ -128,8 +114,7 @@ export default async (req: Request): Promise<Response> => {
   } finally {
     console.log(`Time taken ${Date.now() - start}ms`);
     //TODO: logs
-    // createItem<Logs>("conversion_logs", {
-    // });
+    // createItem(ServeItem.ConversionLogs, {});
 
     formData.append("file", fileBlob, "audio.mp4");
     formData.append(

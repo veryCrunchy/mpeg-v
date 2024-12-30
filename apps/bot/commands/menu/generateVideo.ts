@@ -5,12 +5,13 @@ import {
   MenuCommandContext,
   MessageCommandInteraction,
 } from "seyfert";
-import { embed } from "../../utils/embed.ts";
+import { embed } from "utils/embed.ts";
 import {
   ApplicationCommandType,
   MessageFlags,
 } from "seyfert/lib/types/index.js";
 import { ALLOWED_EXTENSIONS } from "utils/general.ts";
+import { GenerateVideoRequest } from "../../../mpeg-v/types/serve.ts";
 
 @Declare({
   name: "Generate Video",
@@ -53,17 +54,43 @@ export default class GenerateVideo extends ContextMenuCommand {
       });
 
     for (const file of filteredFiles) {
+      const extension = file.filename.split(".").pop();
+      if (!extension || !ALLOWED_EXTENSIONS.includes(extension)) {
+        return ctx.editOrReply({
+          embeds: [
+            embed({
+              message:
+                "Unsupported file type, must be one of the following types:\n`" +
+                ALLOWED_EXTENSIONS.join(", ") +
+                "`",
+              status: "error",
+            }),
+          ],
+        });
+      }
+      const data: GenerateVideoRequest = {
+        url: file.url,
+        logs: {
+          user_id: ctx.author.id,
+          guild_id: ctx.guildId ?? null,
+          date_created: ctx.interaction.createdAt,
+          type: "slash",
+          audio_format: extension,
+          file_name: file.filename,
+        },
+      };
       const res = await fetch(Deno.env.get("STREAM") + "/generate", {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${Deno.env.get("API_TOKEN")}`,
         },
         method: "POST",
-        body: JSON.stringify({ url: file.url }),
+        body: JSON.stringify(data),
       });
 
       if (!res.ok) {
-        return ctx.editOrReply({
+        ctx.editOrReply({
+          flags: MessageFlags.Ephemeral,
           embeds: [
             embed({
               message: "An error occurred while generating the video",
@@ -73,7 +100,7 @@ export default class GenerateVideo extends ContextMenuCommand {
         });
       }
 
-      const data = await res.json();
+      const generatedVideo = await res.json();
       const attachment = new AttachmentBuilder({
         type: "url",
         resolvable: data.url,

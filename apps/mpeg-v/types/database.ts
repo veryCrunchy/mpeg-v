@@ -7,7 +7,7 @@ export interface ScienceInstalls {
 }
 
 export interface ConversionLogs {
-  date_created: string;
+  date_created: string | Date;
   file_name: string;
   type: string;
   conversion_time: number;
@@ -18,7 +18,7 @@ export interface ConversionLogs {
   output_bitrate: number;
   audio_format: string;
   user_id: string;
-  guild_id: string;
+  guild_id: string | null;
   cached: boolean;
 }
 
