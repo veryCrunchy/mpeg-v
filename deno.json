@@ -1,4 +1,5 @@
 {
+  "nodeModulesDir": "auto",
   "workspace": [
     "./apps/*",
     "./apps/mpeg-v/utils",
