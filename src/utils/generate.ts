@@ -3,7 +3,14 @@ import {
   Message,
   MessageContextMenuCommandInteraction,
 } from "discord.js";
-import { render, MessageReply, EditReply, Reply, getSize } from "../utils";
+import {
+  render,
+  MessageReply,
+  getBitrate,
+  Reply,
+  getSize,
+  getAudioBitrate,
+} from "../utils";
 import * as fs from "fs";
 import https from "https";
 import path from "path";
@@ -57,10 +64,13 @@ export async function generateVideo(
             filepath,
             path.join(keys.dirname, outputFile)
           );
-          if (done !== false) {
-            const size = getSize(outputFile);
+          let size,
+            inBitrate = getAudioBitrate(filepath),
+            outBitrate = getAudioBitrate(filepath);
+          if (typeof done !== "boolean") {
+            size = getSize(outputFile);
             log(
-              `\`${(done as number) / 1000}sec\` :: \`${size}kb\` :: \`${
+              `\`${(done.time as number) / 1000}sec\` :: \`${size}kb\` :: \`${
                 attachment.name
               }\` :: \`${
                 message.guild?.name ?? message.author.username
@@ -71,7 +81,11 @@ export async function generateVideo(
             const msg = {
               content:
                 attachments.size > 1 || interaction
-                  ? `[\`\`${attachment.name}\`\`](${messageRef}) ${messageRef}\n-# Completed in ${(done as number) / 1000} seconds`
+                  ? `[\`\`${
+                      attachment.name
+                    }\`\`](${messageRef}) ${messageRef}\n-# Completed in ${
+                      (done.time as number) / 1000
+                    } seconds`
                   : undefined,
               files: [
                 {
@@ -85,7 +99,33 @@ export async function generateVideo(
           } else {
             Error("Something went wrong whilst generating video");
           }
+          if (typeof done !== "boolean") {
+            fetch(process.env.API + "/items/conversion_logs", {
+              method: "post",
+              headers: {
+                Authorization: `Bearer ${process.env.API_TOKEN}`,
+                Accept: "application/json",
+                "Content-Type": "application/json",
+              },
 
+              body: JSON.stringify({
+                audio_format: extension,
+                conversion_time: done.time,
+                date_created:
+                  interaction?.createdAt ?? new Date().toISOString(),
+                file_duration: done.duration,
+                file_name: attachment.name,
+                guild_id: message.guild?.id ?? "DM",
+                input_bitrate: inBitrate,
+                input_size: attachment.size,
+                output_bitrate: outBitrate,
+                output_size: size! * 1000,
+                user_id: interaction?.user.id ?? message.author.id,
+                cached: false,
+                type: interaction ? "menu" : "auto",
+              }),
+            });
+          }
           setTimeout(() => {
             fs.unlink(
               path.join(keys.dirname, `assets/temp/out/${attachment.id}.mp4`),
@@ -106,7 +146,12 @@ export async function generateVideo(
         });
       });
     } else {
-      if(interaction) return Error(`Unsupported file type, must be one of the following types:\n\`${ALLOWED_EXTENSIONS.join(", ")}\``);
+      if (interaction)
+        return Error(
+          `Unsupported file type, must be one of the following types:\n\`${ALLOWED_EXTENSIONS.join(
+            ", "
+          )}\``
+        );
     }
   }
   function Error(e?: string) {

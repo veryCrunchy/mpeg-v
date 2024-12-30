@@ -2,16 +2,16 @@ import { execSync } from "child_process";
 
 const ffmpeg = require("child_process");
 
-export async function render(audio: string, output: string) {
+export async function render(
+  audio: string,
+  output: string
+): Promise<{ time: number; duration: number } | boolean> {
   return new Promise((resolve) => {
     const colors = [`0x1e1f22`, `0x9cf42f`, `0xfc7828`];
     const [width, height] = [250, 100];
     const extension = audio.split(".").pop() || "mp3";
-    const bitrate = calculateBitrate(
-      getSize(audio),
-      getDuration(audio),
-      extension
-    );
+    const duration = getDuration(audio);
+    const bitrate = calculateBitrate(getSize(audio), duration, extension);
 
     // Generate the ffmpeg command
     const command = `ffmpeg -y -f lavfi -i \
@@ -30,13 +30,13 @@ export async function render(audio: string, output: string) {
     -b:a 192k\
     -shortest\
     ${output}`;
-
+    console.log(bitrate);
     try {
       const startTime = Date.now();
       const ls = ffmpeg.exec(command).on("exit", function () {
         const endTime = Date.now();
         const timeElapsed = endTime - startTime;
-        resolve(timeElapsed);
+        resolve({ time: timeElapsed, duration });
       });
 
       ls.stderr?.on("data", function (data: any) {
@@ -55,6 +55,13 @@ function getDuration(file: string) {
     `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${file}"`
   );
   return Math.floor(parseFloat(output.toString()));
+}
+
+export function getAudioBitrate(file: string) {
+  const output = execSync(
+    `ffprobe -v error -select_streams a:0 -show_entries stream=bit_rate -of default=noprint_wrappers=1:nokey=1 "${file}"`
+  );
+  return parseInt(output.toString(), 10);
 }
 export function getSize(file: string) {
   const output = execSync(
