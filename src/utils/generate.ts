@@ -66,7 +66,7 @@ export async function generateVideo(
           );
           let size,
             inBitrate = getAudioBitrate(filepath),
-            outBitrate = getAudioBitrate(filepath);
+            outBitrate = getAudioBitrate(outputFile);
           if (typeof done !== "boolean") {
             size = getSize(outputFile);
             log(
