@@ -11,6 +11,7 @@ import {
 import { embed } from "utils/embed.ts";
 import { ALLOWED_EXTENSIONS } from "utils/general.ts";
 import { GenerateVideoRequest } from "@mpeg-v/types";
+import { Authorization } from "@mpeg-v/utils";
 
 const options = {
   file: createAttachmentOption({
@@ -63,7 +64,7 @@ class Video extends SubCommand {
     const res = await fetch(Deno.env.get("STREAM") + "/generate", {
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${Deno.env.get("API_TOKEN")}`,
+        Authorization,
       },
       method: "POST",
       body: JSON.stringify(data),

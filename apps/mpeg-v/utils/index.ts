@@ -1,10 +1,11 @@
 import type { TableNames, TableSchemas } from "@mpeg-v/types";
+export const Authorization = `Bearer ${Deno.env.get("API_TOKEN")}`;
+
 export async function createItem<T extends TableNames>(
   item: T,
   items: TableSchemas[T]
 ): Promise<void> {
   try {
-    const Authorization = `Bearer ${Deno.env.get("API_TOKEN")}`;
     const response = await fetch(`${Deno.env.get("API")}/items/${item}`, {
       method: "POST",
       headers: {
