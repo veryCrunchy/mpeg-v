@@ -11,6 +11,10 @@
     {
       "name": "web",
       "path": "apps/web"
+    },
+    {
+      "name": "mpeg-v",
+      "path": "apps/mpeg-v"
     }
   ],
   "settings": {
