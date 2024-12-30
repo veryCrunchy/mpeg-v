@@ -1,0 +1,4 @@
+{
+  "name": "@mpeg-v/types",
+  "exports": "./index.ts"
+}

@@ -529,11 +529,6 @@
           "jsr:@std/assert@1",
           "jsr:@std/streams@^1.0.8"
         ]
-      },
-      "website": {
-        "dependencies": [
-          "jsr:@std/assert@1"
-        ]
       }
     }
   }
