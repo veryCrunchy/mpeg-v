@@ -77,7 +77,7 @@ export default class GenerateVideo extends ContextMenuCommand {
           user_id: ctx.author.id,
           guild_id: ctx.guildId ?? null,
           date_created: ctx.interaction.createdAt,
-          type: "slash",
+          type: "menu",
           audio_format: extension,
           file_name: file.filename,
         },

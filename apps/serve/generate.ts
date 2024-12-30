@@ -17,6 +17,7 @@ export default async (req: Request): Promise<Response> => {
   if (!file.ok || !file.body) {
     throw new Error(`Failed to fetch video: ${file.statusText}`);
   }
+  const input_size = Number(file.headers.get("content-length"));
   const nodeReadableStream = new Readable({
     async read() {
       const reader = file.body!.getReader();
@@ -48,40 +49,78 @@ export default async (req: Request): Promise<Response> => {
         .inputOptions("-f", "lavfi")
         .input(nodeReadableStream)
         .complexFilter([
+          //create wavy waveform
           {
             filter: "showwaves",
             options: `s=${width}x${height}:mode=point:colors=${colors[1]}:0.1:0.8`,
             inputs: "1:a",
-            outputs: "v",
+            outputs: "wave",
           },
+          //create line waveform
           {
             filter: "showwaves",
             options: `s=${width}x${height}:mode=line:colors=${colors[2]}`,
             inputs: "1:a",
-            outputs: "v1",
+            outputs: "line",
           },
+          //overlay line waveform on top of color background
           {
             filter: "overlay",
-            inputs: ["0:v", "v1"],
-            outputs: "outv1",
+            inputs: ["0:v", "line"],
+            outputs: "bg_line",
           },
+          //overlay wavy waveform on top of line waveform with color background
           {
             filter: "overlay",
-            inputs: ["outv1", "v"],
-            outputs: "outv",
+            inputs: ["bg_line", "wave"],
+            outputs: ["bg_line_wave"],
           },
+          // draw text over bg_line_wave
+          // {
+          //   filter: "drawtext",
+          //   options: {
+          //     // fontfile: "/path/to/font.ttf",
+          //     text: json.logs.file_name,
+          //     fontsize: 20,
+          //     fontcolor: "white",
+          //     x: "2", // Centers the text horizontally
+          //     y: "10", // Positions the text vertically at 1/10th of the height
+          //     shadowcolor: "black",
+          //     shadowx: 2,
+          //     shadowy: 2,
+          //     enable: "between(t,0,15)",
+          //   },
+          //   inputs: "bg_line_wave_for_text",
+          //   outputs: "text",
+          // },
+          //fade out the text
+          // `drawtext=text=test:fontsize=20:fontcolor=white:x=(${width}_w)/2:y=(${height}-text_h)/10:shadowcolor=black:shadowx=2:shadowy=2:enable='between(t,0,15)',fade=t=out:st=5:d=1[final_output]`, // {
+          //TODO: FIGURE THIS SHIT OUT
+          // {
+          //   filter: "fade",
+          //   options: {
+          //     t: "out",
+          //     st: "5",
+          //     d: "1",
+          //   },
+          //   inputs: "text",
+          //   outputs: "faded_text",
+          // },
+          // //overlay faded text on top of bg_line_wave
+          // {
+          //   filter: "overlay",
+          //   inputs: ["bg_line_wave", "faded_text"],
+          //   outputs: "final_output",
+          // },
           {
             filter: "fps",
             options: "15",
-            inputs: "outv",
-            outputs: "outv",
+            inputs: "bg_line_wave",
+            outputs: "output",
           },
         ])
-        .map("outv")
+        .map("output")
         .addOption("-map 1:a")
-        // .addOption(
-        //   "-vf \"drawtext=text='abcd':fontfile=bpmono.ttf:y=h-line_h-10:x=w-mod(max(t-4.5,0)*(w+tw)/5.5,(w+tw)):fontcolor=ffcc00:fontsize=40:shadowx=2:shadowy=2\""
-        // )
         // .videoBitrate(`${bitrate}k`)
         .videoCodec("libx264")
         .outputOptions("-pix_fmt yuv420p")
@@ -103,14 +142,14 @@ export default async (req: Request): Promise<Response> => {
           resolve(true);
         })
         .on("error", (err: Error) => {
-          console.error("FFMPEG Error: " + err.message);
-          reject(err);
+          console.error("FFMPEG Error: " + err);
+          reject(err.message);
         })
         .output(output)
         .run();
     });
-  } catch (error: unknown) {
-    return new Response((error as Error).message, { status: 500 });
+  } catch (error) {
+    return new Response(String(error), { status: 500 });
   }
   const conversionEnd = Date.now();
 
@@ -125,7 +164,21 @@ export default async (req: Request): Promise<Response> => {
   } finally {
     console.log(`Time taken ${Date.now() - start}ms`);
     //TODO: logs
-    // createItem(ServeItem.ConversionLogs, {});
+    createItem(ServeItem.ConversionLogs, {
+      audio_format: json.logs.audio_format,
+      conversion_time: conversionEnd - conversionStart,
+      date_created: json.logs.date_created,
+      file_duration: 0,
+      file_name: json.logs.file_name,
+      guild_id: json.logs.guild_id,
+      input_bitrate: 0,
+      input_size,
+      output_bitrate: 0,
+      output_size: fileSize,
+      user_id: json.logs.user_id,
+      cached: false,
+      type: json.logs.type,
+    });
 
     const formData = new FormData();
     const fileBlob = new Blob([fileBuffer]);
