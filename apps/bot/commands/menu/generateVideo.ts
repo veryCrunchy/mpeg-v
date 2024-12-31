@@ -11,7 +11,8 @@ import {
   MessageFlags,
 } from "seyfert/lib/types/index.js";
 import { ALLOWED_EXTENSIONS } from "utils/general.ts";
-import { GenerateVideoRequest } from "../../../mpeg-v/types/serve.ts";
+import { GenerateVideoRequest } from "@mpeg-v/types";
+import { Authorization } from "@mpeg-v/utils";
 
 @Declare({
   name: "Generate Video",
@@ -21,6 +22,7 @@ import { GenerateVideoRequest } from "../../../mpeg-v/types/serve.ts";
 export default class GenerateVideo extends ContextMenuCommand {
   override async run(ctx: MenuCommandContext<MessageCommandInteraction<true>>) {
     const files = ctx.target.attachments;
+    await ctx.deferReply();
 
     if (files.length === 0)
       return ctx.editOrReply({
@@ -68,13 +70,14 @@ export default class GenerateVideo extends ContextMenuCommand {
           ],
         });
       }
+
       const data: GenerateVideoRequest = {
         url: file.url,
         logs: {
           user_id: ctx.author.id,
           guild_id: ctx.guildId ?? null,
           date_created: ctx.interaction.createdAt,
-          type: "slash",
+          type: "menu",
           audio_format: extension,
           file_name: file.filename,
         },
@@ -82,33 +85,31 @@ export default class GenerateVideo extends ContextMenuCommand {
       const res = await fetch(Deno.env.get("STREAM") + "/generate", {
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${Deno.env.get("API_TOKEN")}`,
+          Authorization,
         },
         method: "POST",
         body: JSON.stringify(data),
       });
-
       if (!res.ok) {
-        ctx.editOrReply({
+        return ctx.editOrReply({
           flags: MessageFlags.Ephemeral,
           embeds: [
             embed({
-              message: "An error occurred while generating the video",
+              message: `An error occurred while generating the video. ${res.statusText}`,
               status: "error",
             }),
           ],
         });
       }
-
-      const generatedVideo = await res.json();
+      const conversionTime = res.headers.get("Conversion-Time");
       const attachment = new AttachmentBuilder({
-        type: "url",
-        resolvable: data.url,
+        type: "buffer",
+        resolvable: res.body,
         filename: file.id + ".mp4",
-        description: "dargy was here", // TODO: change later
       });
 
       return ctx.editOrReply({
+        content: `-# Completed in ${Number(conversionTime) / 1000} seconds`,
         embeds: [
           embed({
             message: "Video generated successfully",

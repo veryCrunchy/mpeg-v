@@ -9,7 +9,7 @@ export interface ScienceInstalls {
 export interface ConversionLogs {
   date_created: string | Date;
   file_name: string;
-  type: string;
+  type: "auto" | "slash" | "menu" | "button";
   conversion_time: number;
   input_size: number;
   output_size: number;

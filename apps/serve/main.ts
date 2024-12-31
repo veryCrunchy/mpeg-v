@@ -1,11 +1,12 @@
 import generate from "./generate.ts";
+import { Authorization } from "@mpeg-v/utils";
 
 Deno.serve({ port: 3000 }, async (req) => {
   const url = new URL(req.url);
 
   // POST /generate
   if (url.pathname === "/generate" && req.method === "POST") {
-    if (req.headers.get("Authorization") !== Deno.env.get("API_TOKEN"))
+    if (req.headers.get("Authorization") !== Authorization)
       return new Response(null, { status: 401 });
     return await generate(req);
   }

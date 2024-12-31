@@ -18,7 +18,7 @@
     "npm:nuxt@3.15.0": "3.15.0_@types+node@22.5.4_vue@3.5.13_vue-router@4.5.0__vue@3.5.13_jiti@2.4.2",
     "npm:nuxt@^3.15.0": "3.15.0_@types+node@22.5.4_vue@3.5.13_vue-router@4.5.0__vue@3.5.13_jiti@2.4.2",
     "npm:postcss@^8.4.49": "8.4.49",
-    "npm:seyfert@2.1.1-dev-12523954971.0": "2.1.1-dev-12523954971.0",
+    "npm:seyfert@dev": "2.2.1-dev-12543676507.0",
     "npm:vue-router@latest": "4.5.0_vue@3.5.13",
     "npm:vue@latest": "3.5.13"
   },
@@ -4154,8 +4154,8 @@
     "setprototypeof@1.2.0": {
       "integrity": "sha512-E5LDX7Wrp85Kil5bhZv46j8jOeboKq5JMmYM3gVGdGH8xFpPWXUMsNrlODCrkoxMEeNi/XZIwuRvY4XNwYMJpw=="
     },
-    "seyfert@2.1.1-dev-12523954971.0": {
-      "integrity": "sha512-fLZlOGoPfXTiQiaMUxYTNtzfZv9I0KBfw+fvIxcXYpBn3z5eJPGiBLttcGR4FIGwmHSnxLrbmePVyAjw2C38/Q=="
+    "seyfert@2.2.1-dev-12543676507.0": {
+      "integrity": "sha512-c844S3htqGKEWHf+fgKu1Nz4QuyywZNAFANZMug1xWQhVwSF5Y0QBh50x7vbRRjpONq+iORuhRYEdqME0gvMww=="
     },
     "shebang-command@2.0.0": {
       "integrity": "sha512-kHxr2zZpYtdmrN1qDjrrX/Z1rR1kG8Dx+gkpK1G4eXmvXswmcE1hTWBWYUzlraYw1/yZp6YuDY77YtvbN0dmDA==",
@@ -5067,7 +5067,7 @@
       "apps/bot": {
         "dependencies": [
           "jsr:@std/assert@1",
-          "npm:seyfert@2.1.1-dev-12523954971.0"
+          "npm:seyfert@dev"
         ]
       },
       "apps/serve": {
