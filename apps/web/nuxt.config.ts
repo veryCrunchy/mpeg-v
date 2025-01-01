@@ -1,6 +1,7 @@
 export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: ["@nuxtjs/tailwindcss", "@nuxt/fonts"],
+
   fonts: {
     google: {
       families: {
@@ -8,4 +9,6 @@ export default defineNuxtConfig({
       },
     },
   },
+
+  compatibilityDate: "2025-01-01",
 });
