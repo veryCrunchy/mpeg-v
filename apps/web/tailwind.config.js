@@ -7,7 +7,8 @@ module.exports = {
       backgroundColor: {
         default: "#fde6e1",
         primary: "#ff893a",
-        secondary: "#ffc068"
+        secondary: "#ffc068",
+        discord: "#383a40"
       },
       colors: {
         primary: "#ff893a",
