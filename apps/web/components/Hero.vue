@@ -8,7 +8,7 @@
         <button class="bg-primary/90 text-white px-4 py-2 rounded-lg mt-4">Invite to Server</button>
       </div>
     </div>
-    <img src="https://via.placeholder.com/150" alt="Placeholder Image" class="ml-4">
+    <img src="/discord_preview.webp" alt="Discord Preview" class="w-2/5 rounded-lg" />
   </div>
 </template>
 
