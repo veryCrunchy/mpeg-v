@@ -1,26 +1,25 @@
-FROM denoland/deno:alpine-2.1.4
+# Build stage
+FROM denoland/deno:alpine-2.1.4 AS build
 
 WORKDIR /app
-
-# Switch to root user to perform installation
-USER root
 
 COPY deno.json deno.template.json
 RUN sed '2i "nodeModulesDir": "auto",' deno.template.json > deno.json
 RUN deno install
-
-# Set DENO_DIR to a writable directory
-ENV DENO_DIR=/app/.deno_dir
-
-# Create the DENO_DIR directory and set permissions
-RUN mkdir -p /app/.deno_dir && chown -R deno:deno /app
+RUN deno task postinstall
 
 COPY . .
 
-# Switch to deno user before running the build command
-USER deno
-
 RUN deno task build
+
+# Runtime stage
+FROM denoland/deno:alpine-2.1.4
+
+WORKDIR /app
+
+COPY --from=build /app /app
+
+USER deno
 
 EXPOSE 3000
 
