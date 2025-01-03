@@ -10,9 +10,7 @@ import {
   ApplicationCommandType,
   MessageFlags,
 } from "seyfert/lib/types/index.js";
-import { ALLOWED_EXTENSIONS } from "utils/general.ts";
-import { GenerateVideoRequest } from "@mpeg-v/types";
-import { Authorization } from "@mpeg-v/utils";
+import { filterFiles, generateVideo } from "utils/videoUtils.ts";
 
 @Declare({
   name: "Generate Video",
@@ -20,7 +18,7 @@ import { Authorization } from "@mpeg-v/utils";
   type: ApplicationCommandType.Message,
 })
 export default class GenerateVideo extends ContextMenuCommand {
-  override async run(ctx: MenuCommandContext<MessageCommandInteraction<true>>) {
+  override async run(ctx: MenuCommandContext<MessageCommandInteraction>) {
     const files = ctx.target.attachments;
     await ctx.deferReply();
 
@@ -36,78 +34,29 @@ export default class GenerateVideo extends ContextMenuCommand {
         flags: MessageFlags.Ephemeral,
       });
 
-    const filteredFiles = files.filter((file) => {
-      const extension = file.filename.split(".").pop();
-      return extension && ALLOWED_EXTENSIONS.includes;
-    });
-
-    if (filteredFiles.length === 0)
-      return ctx.editOrReply({
-        embeds: [
-          embed({
-            message:
-              "Unsupported file type, must be one of the following types:\n`" +
-              ALLOWED_EXTENSIONS.join(", ") +
-              "`",
-            status: "error",
-          }),
-        ],
-        flags: MessageFlags.Ephemeral,
-      });
+    const filteredFiles = filterFiles(files, ctx);
+    if (!filteredFiles) return;
 
     for (const file of filteredFiles) {
-      const extension = file.filename.split(".").pop();
-      if (!extension || !ALLOWED_EXTENSIONS.includes(extension)) {
-        return ctx.editOrReply({
-          embeds: [
-            embed({
-              message:
-                "Unsupported file type, must be one of the following types:\n`" +
-                ALLOWED_EXTENSIONS.join(", ") +
-                "`",
-              status: "error",
-            }),
-          ],
-        });
-      }
-
-      const data: GenerateVideoRequest = {
-        url: file.url,
-        logs: {
-          user_id: ctx.author.id,
-          guild_id: ctx.guildId ?? null,
-          date_created: ctx.interaction.createdAt,
-          type: "menu",
-          audio_format: extension,
-          file_name: file.filename,
-        },
-      };
-      const res = await fetch(Deno.env.get("STREAM") + "/generate", {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization,
-        },
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      const [attachment, res] = await generateVideo(file, ctx, "menu");
       if (!res.ok) {
         return ctx.editOrReply({
           flags: MessageFlags.Ephemeral,
           embeds: [
             embed({
-              message: `An error occurred while generating the video. ${res.statusText}`,
+              message: `An error occurred while generating the video. 
+Reason: ${
+                res.statusText === "Not Found"
+                  ? "Maintenance; Please try again (soon)."
+                  : res.statusText
+              }`,
               status: "error",
             }),
           ],
         });
       }
-      const conversionTime = res.headers.get("Conversion-Time");
-      const attachment = new AttachmentBuilder({
-        type: "buffer",
-        resolvable: res.body,
-        filename: file.id + ".mp4",
-      });
 
+      const conversionTime = res.headers.get("Conversion-Time");
       return ctx.editOrReply({
         content: `-# Completed in ${Number(conversionTime) / 1000} seconds`,
         embeds: [

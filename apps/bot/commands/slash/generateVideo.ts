@@ -10,8 +10,7 @@ import {
 } from "seyfert";
 import { embed } from "utils/embed.ts";
 import { ALLOWED_EXTENSIONS } from "utils/general.ts";
-import { GenerateVideoRequest } from "@mpeg-v/types";
-import { Authorization } from "@mpeg-v/utils";
+import { filterFiles, generateVideo } from "utils/videoUtils.ts";
 
 const options = {
   file: createAttachmentOption({
@@ -34,41 +33,11 @@ class Video extends SubCommand {
   override async run(ctx: CommandContext<typeof options>) {
     const audio = ctx.options.file;
 
-    const extension = audio.filename.split(".").pop();
-    if (!extension || !ALLOWED_EXTENSIONS.includes(extension)) {
-      return ctx.editOrReply({
-        embeds: [
-          embed({
-            message:
-              "Unsupported file type, must be one of the following types:\n`" +
-              ALLOWED_EXTENSIONS.join(", ") +
-              "`",
-            status: "error",
-          }),
-        ],
-      });
-    }
+    const filteredFiles = filterFiles([audio], ctx);
+    if (!filteredFiles) return;
 
     await ctx.deferReply(!!ctx.options.private);
-    const data: GenerateVideoRequest = {
-      url: audio.url,
-      logs: {
-        user_id: ctx.author.id,
-        guild_id: ctx.guildId ?? null,
-        date_created: ctx.interaction.createdAt,
-        type: "slash",
-        audio_format: extension,
-        file_name: audio.filename,
-      },
-    };
-    const res = await fetch(Deno.env.get("STREAM") + "/generate", {
-      headers: {
-        "Content-Type": "application/json",
-        Authorization,
-      },
-      method: "POST",
-      body: JSON.stringify(data),
-    });
+    const [_, res] = await generateVideo(audio, ctx, "slash");
 
     if (!res.ok) {
       return ctx.editOrReply({
@@ -81,7 +50,6 @@ class Video extends SubCommand {
       });
     }
 
-    // const data = await res.json();
     const attachment = new AttachmentBuilder({
       type: "url",
       resolvable: "", //TODO:
