@@ -13,11 +13,15 @@ RUN deno install
 ENV DENO_DIR=/app/.deno_dir
 
 # Create the DENO_DIR directory and set permissions
-RUN mkdir -p /app/.deno_dir && chown -R deno:deno /app/.deno_dir
-
-USER deno
+RUN mkdir -p /app/.deno_dir && chown -R deno:deno /app
 
 COPY . .
+
+# Switch to deno user before running the build command
+USER deno
+
+RUN deno task build
+
 EXPOSE 3000
 
 CMD ["run","--allow-net","--allow-read","--allow-env",".output/server/index.mjs"]
