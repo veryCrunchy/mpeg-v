@@ -5,7 +5,8 @@ WORKDIR /app
 # Switch to root user to perform installation
 USER root
 
-COPY deno.json ./
+COPY deno.json deno.template.json
+RUN sed '2i "nodeModulesDir": "auto",' deno.template.json > deno.json
 RUN deno install
 
 # Set DENO_DIR to a writable directory
