@@ -3,13 +3,11 @@ FROM denoland/deno:alpine-2.1.4 AS build
 
 WORKDIR /app
 
-COPY deno.json deno.template.json
-RUN sed '2i "nodeModulesDir": "auto",' deno.template.json > deno.json
-RUN deno install
-RUN deno task postinstall
-
 COPY . .
 
+RUN sed '2i "nodeModulesDir": "auto",' deno.json > deno.json.tmp && mv deno.json.tmp deno.json
+RUN deno install
+RUN deno task postinstall
 RUN deno task build
 
 # Runtime stage
