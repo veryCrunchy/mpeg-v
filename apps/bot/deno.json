@@ -1,4 +1,5 @@
 {
+	"nodeModulesDir": "none",
 	"tasks": {
 		"dev": "deno run --env-file --allow-sys --allow-net --allow-env --allow-read --allow-write --watch main.ts",
 		"start": "deno run --env-file --allow-sys --allow-net --allow-env --allow-read --allow-write main.ts"
