@@ -1,6 +1,15 @@
+# weights that no dev can lift
+node_modules
+
+# lock
+yarn.lock
+package-lock.json
+deno.lock
+pnpm-lock.yaml
+
+# env
 *.env
 */.env
-node_modules
 
 # Seyfert command cache
 apps/bot/commands.json
