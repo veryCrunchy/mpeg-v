@@ -9,11 +9,11 @@ import {
 } from 'seyfert';
 import { embed, handleError } from 'utils/embed.ts';
 import { ALLOWED_EXTENSIONS } from 'utils/general.ts';
-import { filterFiles, generateVideo } from 'utils/videoUtils.ts';
+import { filterFiles, formatFileSize, generateVideo } from 'utils/videoUtils.ts';
 
 const options = {
 	file: createAttachmentOption({
-		description: `The audio file to convert [${ALLOWED_EXTENSIONS.join(', ')}]`,
+		description: `The audio file to convert (${ALLOWED_EXTENSIONS.join(', ')})`,
 		required: true,
 	}),
 	private: createBooleanOption({
@@ -35,22 +35,32 @@ class Video extends SubCommand {
 		if (!filteredFiles) return;
 
 		await ctx.deferReply(!!ctx.options.private);
-		const [attachment, res] = await generateVideo(audio, ctx, 'slash');
 
-		if (!res.ok) throw new Error('Failed to generate video');
+		const guild = await ctx.guild();
+		const [attachment, res] = await generateVideo(
+			audio,
+			ctx,
+			'slash',
+			guild?.premiumTier || 0,
+		);
 
+		if (res.status == 413) {
+			throw new Error(
+				'File size is too large, please try again with a smaller file',
+			);
+		}
+		if (!res.ok || !attachment) throw new Error('Failed to generate video');
+
+		const conversionTime = res.headers.get('Conversion-Time');
 		return ctx.editOrReply({
-			embeds: [
-				embed({
-					message: 'Video generated successfully',
-					status: 'success',
-				}),
-			],
+			content: `\`${audio.filename} (${
+				formatFileSize(audio.size)
+			})\`\n-# Completed in ${Number(conversionTime) / 1000} seconds`,
 			files: [attachment],
 		});
 	}
 
-	override async onRunError(ctx: CommandContext, error: unknown) {
+	override onRunError(ctx: CommandContext, error: unknown) {
 		return handleError(ctx, error);
 	}
 }

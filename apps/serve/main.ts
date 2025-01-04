@@ -1,13 +1,15 @@
 import generate from "./generate.ts";
 import { Authorization } from "@mpeg-v/utils";
 
-Deno.serve({ port: 3000 }, async (req) => {
+Deno.serve({ port: 4934 }, async (req) => {
   const url = new URL(req.url);
 
   // POST /generate
   if (url.pathname === "/generate" && req.method === "POST") {
-    if (req.headers.get("Authorization") !== Authorization)
+    if (req.headers.get("Authorization") !== Authorization) {
+      console.log("FUCK!! they dont have the right key");
       return new Response(null, { status: 401 });
+    }
     return await generate(req);
   }
   return new Response("I'm a teapot", { status: 418 });

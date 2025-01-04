@@ -3,7 +3,7 @@ import ffmpeg from "npm:fluent-ffmpeg";
 import { Readable, Writable } from "node:stream";
 import { Buffer } from "node:buffer";
 import { createItem } from "@mpeg-v/utils";
-import { ServeItem, ConversionLogs, GenerateVideoRequest } from "@mpeg-v/types";
+import { ConversionLogs, GenerateVideoRequest, ServeItem } from "@mpeg-v/types";
 export default async (req: Request): Promise<Response> => {
   const start = Date.now();
 
@@ -52,7 +52,9 @@ export default async (req: Request): Promise<Response> => {
           //create wavy waveform
           {
             filter: "showwaves",
-            options: `s=${width}x${height}:mode=point:colors=${colors[1]}:0.1:0.8`,
+            options: `s=${width}x${height}:mode=point:colors=${
+              colors[1]
+            }:0.1:0.8`,
             inputs: "1:a",
             outputs: "wave",
           },
@@ -187,13 +189,15 @@ export default async (req: Request): Promise<Response> => {
       "payload_json",
       JSON.stringify({
         content: "Test",
-      })
+      }),
     );
     //cache the converted file
     fetch(
-      `https://discord.com/api/v10/channels/${Deno.env.get(
-        "CACHE_CHANNEL"
-      )}/messages`,
+      `https://discord.com/api/v10/channels/${
+        Deno.env.get(
+          "CACHE_CHANNEL",
+        )
+      }/messages`,
       {
         method: "POST",
         headers: {
@@ -201,7 +205,7 @@ export default async (req: Request): Promise<Response> => {
           Authorization: `Bot ${Deno.env.get("BOT_TOKEN")}`,
         },
         body: formData,
-      }
+      },
     );
     //TODO: store file "cache" in db
   }

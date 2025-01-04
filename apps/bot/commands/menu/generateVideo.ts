@@ -27,26 +27,35 @@ export default class GenerateVideo extends ContextMenuCommand {
 		const filteredFiles = filterFiles(files, ctx);
 		if (!filteredFiles) return;
 
-		for (const file of filteredFiles) {
-			const [attachment, res] = await generateVideo(file, ctx, 'menu');
+		const guild = await ctx.guild();
 
-			if (!res.ok) throw new Error('Failed to generate video');
+		for (const file of filteredFiles) {
+			const [attachment, res] = await generateVideo(
+				file,
+				ctx,
+				'menu',
+				guild?.premiumTier || 0,
+			);
+
+			if (res.status == 413) {
+				throw new Error(
+					'File size is too large, please try again with a smaller file',
+				);
+			}
+			if (!res.ok || !attachment) throw new Error('Failed to generate video');
 
 			const conversionTime = res.headers.get('Conversion-Time');
+			console.log(ctx.interaction);
 			return ctx.editOrReply({
-				content: `-# Completed in ${Number(conversionTime) / 1000} seconds`,
-				embeds: [
-					embed({
-						message: 'Video generated successfully',
-						status: 'success',
-					}),
-				],
+				content: `\`${file.filename}\` ${ctx.target.url}\n-# Completed in ${
+					Number(conversionTime) / 1000
+				} seconds`,
 				files: [attachment],
 			});
 		}
 	}
 
-	override async onRunError(ctx: MenuCommandContext<any, never>, error: unknown) {
+	override onRunError(ctx: MenuCommandContext<any, never>, error: unknown) {
 		return handleError(ctx, error);
 	}
 }

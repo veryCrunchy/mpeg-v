@@ -12,4 +12,5 @@ export interface GenerateVideoRequest {
     | "output_bitrate"
     | "output_size"
   >;
+  limit: number;
 }

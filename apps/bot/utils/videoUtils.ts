@@ -18,11 +18,22 @@ export function filterFiles(files: File[], ctx: Context): File[] | null {
 	} else return filteredFiles;
 }
 
+export function formatFileSize(size: number): string {
+	const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+	let i = 0;
+	while (size >= 1024) {
+		size /= 1024;
+		i++;
+	}
+	return size.toFixed(2) + ' ' + units[i];
+}
+
 export async function generateVideo(
 	file: File,
 	ctx: Context,
 	type: ConversionLogs['type'],
-): Promise<[AttachmentBuilder, Response]> {
+	sizeLimit: number,
+): Promise<[AttachmentBuilder | null, Response]> {
 	const extension = file.filename.split('.').pop()!;
 	const data: GenerateVideoRequest = {
 		url: file.url,
@@ -34,6 +45,7 @@ export async function generateVideo(
 			audio_format: extension,
 			file_name: file.filename,
 		},
+		limit: sizeLimit,
 	};
 	const res = await fetch(Deno.env.get('STREAM') + '/generate', {
 		headers: {
@@ -43,11 +55,16 @@ export async function generateVideo(
 		method: 'POST',
 		body: JSON.stringify(data),
 	});
-	const attachment = new AttachmentBuilder({
-		type: 'buffer',
-		resolvable: res.body,
-		filename: file.id + '.mp4',
-	});
 
-	return [attachment, res];
+	if (res.ok) {
+		const attachment = new AttachmentBuilder({
+			type: 'buffer',
+			resolvable: res.body,
+			filename: file.id + '.mp4',
+		});
+
+		return [attachment, res];
+	} else {
+		return [null, res];
+	}
 }

@@ -8,7 +8,10 @@
     "npm:@nuxt/fonts@~0.10.3": "0.10.3_jiti@2.4.2",
     "npm:@nuxt/image@1.8.1": "1.8.1",
     "npm:@nuxtjs/tailwindcss@6.12.2": "6.12.2_postcss@8.4.49_tailwindcss@3.4.17__postcss@8.4.49",
+    "npm:@types/fluent-ffmpeg@*": "2.1.27",
+    "npm:@types/node@*": "22.5.4",
     "npm:clsx@^2.1.1": "2.1.1",
+    "npm:fluent-ffmpeg@*": "2.1.3",
     "npm:nuxt@3.15.0": "3.15.0_vue@3.5.13_vue-router@4.5.0__vue@3.5.13_jiti@2.4.2",
     "npm:nuxt@^3.15.0": "3.15.0_vue@3.5.13_vue-router@4.5.0__vue@3.5.13_jiti@2.4.2",
     "npm:seyfert@dev": "2.2.1-dev-12553471154.0",
@@ -1100,6 +1103,12 @@
     "@types/estree@1.0.6": {
       "integrity": "sha512-AYnb1nQyY49te+VRAVgmzfcgjYS91mY5P0TKUDCLEM+gNnA+3T6rWITXRLYCpahpqSQbN5cE+gHpnPyXjHWxcw=="
     },
+    "@types/fluent-ffmpeg@2.1.27": {
+      "integrity": "sha512-QiDWjihpUhriISNoBi2hJBRUUmoj/BMTYcfz+F+ZM9hHWBYABFAE6hjP/TbCZC0GWwlpa3FzvHH9RzFeRusZ7A==",
+      "dependencies": [
+        "@types/node"
+      ]
+    },
     "@types/http-proxy@1.17.15": {
       "integrity": "sha512-25g5atgiVNTIv0LBDTg1H74Hvayx0ajtJPLLcYE3whFv75J0pWNtOBzaXJQgDTmrX1bx5U9YC2w/n65BN1HwRQ==",
       "dependencies": [
@@ -1444,6 +1453,9 @@
     },
     "async-sema@3.1.1": {
       "integrity": "sha512-tLRNUXati5MFePdAk8dw7Qt7DpxPB60ofAgn8WRhW6a2rcimZnYBP9oxHiv0OHy+Wz7kPMG+t4LGdt31+4EmGg=="
+    },
+    "async@0.2.10": {
+      "integrity": "sha512-eAkdoKxU6/LkKDBzLpT+t6Ff5EtfSF4wx1WfJiPEEV7WNLnDaRXk0oVysiEPm262roaachGexwUv94WhSgN5TQ=="
     },
     "async@2.6.4": {
       "integrity": "sha512-mzo5dfJYwAn29PeiJ0zvwTo04zj8HDJj0Mn8TD7sno7q12prdbnasKJHhkm2c1LgrhlJ0teaea8860oxi51mGA==",
@@ -2327,6 +2339,13 @@
     },
     "flatted@3.3.2": {
       "integrity": "sha512-AiwGJM8YcNOaobumgtng+6NHuOqC3A7MixFeDafM3X9cIUM+xUXoS5Vfgf+OihAYe20fxqNM9yPBXJzRtZ/4eA=="
+    },
+    "fluent-ffmpeg@2.1.3": {
+      "integrity": "sha512-Be3narBNt2s6bsaqP6Jzq91heDgOEaDCJAXcE3qcma/EJBSy5FB4cvO31XBInuAuKBx8Kptf8dkhjK0IOru39Q==",
+      "dependencies": [
+        "async@0.2.10",
+        "which@1.3.1"
+      ]
     },
     "fontaine@0.5.0": {
       "integrity": "sha512-vPDSWKhVAfTx4hRKT777+N6Szh2pAosAuzLpbppZ6O3UdD/1m6OlHjNcC3vIbgkRTIcLjzySLHXzPeLO2rE8cA==",
@@ -4981,6 +5000,12 @@
       "dependencies": [
         "tr46",
         "webidl-conversions"
+      ]
+    },
+    "which@1.3.1": {
+      "integrity": "sha512-HxJdYWq1MTIQbJ3nw0cqssHoTNU267KlrDuGZ1WYlxDStUtKUhOaJmh112/TZmHxxUfuJqPXSOm7tDyas0OSIQ==",
+      "dependencies": [
+        "isexe"
       ]
     },
     "which@2.0.2": {

@@ -1,3 +1,6 @@
 *.env
 */.env
 node_modules
+
+# Seyfert command cache
+apps/bot/commands.json
