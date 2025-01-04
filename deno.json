@@ -1,10 +1,17 @@
 {
-  "nodeModulesDir": "auto",
+  "tasks": {
+    "build:bot": "docker build -t mpeg-v-bot -f apps/bot/Dockerfile .",
+    "build:hooks": "docker build -t mpeg-v-hooks -f apps/hooks/Dockerfile apps/hooks",
+    "build:serve": "docker build -t mpeg-v-serve -f apps/serve/Dockerfile ."
+  },
   "workspace": [
     "./apps/bot",
     "./apps/serve",
-    "./apps/web",
+    "./apps/hooks",
     "./apps/mpeg-v/utils",
     "./apps/mpeg-v/types"
+  ],
+  "exclude": [
+    "./apps/web"
   ]
 }

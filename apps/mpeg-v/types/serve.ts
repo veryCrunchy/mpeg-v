@@ -2,6 +2,7 @@ import type { ConversionLogs } from "./database.ts";
 
 export interface GenerateVideoRequest {
   url: string;
+  limit: number;
   logs: Omit<
     ConversionLogs,
     | "cached"

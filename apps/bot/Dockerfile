@@ -1,0 +1,9 @@
+FROM denoland/deno:alpine-2.1.4
+
+WORKDIR /app
+COPY apps/mpeg-v ./apps/mpeg-v 
+COPY apps/bot ./apps/bot
+
+EXPOSE 3000
+WORKDIR /app/apps/bot
+CMD ["run","--allow-sys","--allow-net","--allow-read","--allow-write","--allow-env","main.ts"]
