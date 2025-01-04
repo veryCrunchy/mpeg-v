@@ -1,0 +1,2 @@
+[start]
+cmd = 'deno run --allow-net --allow-run --allow-sys --allow-env --allow-read main.ts'
