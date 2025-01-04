@@ -1,11 +1,13 @@
 {
+	"nodeModulesDir": "none",
 	"tasks": {
-		"dev": "deno run --env-file --allow-sys --allow-net --allow-env --allow-read --allow-write --watch main.ts"
+		"dev": "deno run --env-file --allow-sys --allow-net --allow-env --allow-read --allow-write --watch main.ts",
+		"start": "deno run --env-file --allow-sys --allow-net --allow-env --allow-read --allow-write main.ts"
 	},
 	"imports": {
 		"utils/": "./utils/",
 		"@std/assert": "jsr:@std/assert@1",
-		"seyfert": "npm:seyfert@2.1.1-dev-12523954971.0"
+		"seyfert": "npm:seyfert@dev"
 	},
 	"fmt": {
 		"useTabs": true,

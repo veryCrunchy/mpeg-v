@@ -1,7 +1,9 @@
 {
   "nodeModulesDir": "auto",
   "workspace": [
-    "./apps/*",
+    "./apps/bot",
+    "./apps/serve",
+    "./apps/web",
     "./apps/mpeg-v/utils",
     "./apps/mpeg-v/types"
   ]
