@@ -33,12 +33,13 @@ const options = {
 @Options(options)
 class Video extends SubCommand {
   override async run(ctx: CommandContext<typeof options>) {
+    await ctx.deferReply(!!ctx.options.private);
+    
     const audio = ctx.options.file;
 
     const filteredFiles = filterFiles([audio]);
     if (!filteredFiles) return;
 
-    await ctx.deferReply(!!ctx.options.private);
 
     const [attachment, res] = await generateVideo(
       audio,

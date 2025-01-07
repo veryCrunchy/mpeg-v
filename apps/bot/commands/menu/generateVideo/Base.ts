@@ -1,22 +1,14 @@
 import {
   ContextMenuCommand,
-  Declare,
   MenuCommandContext,
   MessageCommandInteraction,
 } from "seyfert";
 import { handleError } from "utils/embed.ts";
-import { ApplicationCommandType } from "seyfert/lib/types/index.js";
 import { filterFiles, generateVideo } from "utils/generateVideo.ts";
 
-@Declare({
-  name: "Generate Video",
-  integrationTypes: ["GuildInstall", "UserInstall"],
-  type: ApplicationCommandType.Message,
-})
-export default class GenerateVideo extends ContextMenuCommand {
-  override async run(ctx: MenuCommandContext<MessageCommandInteraction>) {
+export class GenerateVideoBase extends ContextMenuCommand {
+  async run(ctx: MenuCommandContext<MessageCommandInteraction>) {
     const files = ctx.target.attachments;
-    await ctx.deferReply();
 
     if (files.length === 0) {
       throw new Error(
