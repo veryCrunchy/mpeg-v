@@ -2,22 +2,21 @@
 import ffmpeg from "npm:fluent-ffmpeg";
 import { Readable, Writable } from "node:stream";
 import { Buffer } from "node:buffer";
-import { createItem } from "@mpeg-v/utils";
-import { ConversionLogs, GenerateVideoRequest, ServeItem } from "@mpeg-v/types";
+import { createItem, determineSizeLimit } from "@mpeg-v/utils";
+import { GenerateVideoRequest, ServeItem } from "@mpeg-v/types";
+const env = Deno.env.get("ENV");
 export default async (req: Request): Promise<Response> => {
-  const start = Date.now();
-
   const colors = [`0x1e1f22`, `0xfc7828`, `0x9cf42f`];
   const [width, height] = [250, 100];
   // const bitrate = "320";
   const json: GenerateVideoRequest = await req.json();
   if (!json.url) return new Response(null, { status: 400 });
   const file = await fetch(json.url);
-  console.log("Before file", Date.now() - start);
   if (!file.ok || !file.body) {
     throw new Error(`Failed to fetch video: ${file.statusText}`);
   }
   const input_size = Number(file.headers.get("content-length"));
+  const max_size = determineSizeLimit(json.tier_limit);
   const nodeReadableStream = new Readable({
     async read() {
       const reader = file.body!.getReader();
@@ -39,8 +38,8 @@ export default async (req: Request): Promise<Response> => {
       callback();
     },
   });
-  const conversionStart = Date.now();
   const codec = "copy"; // aac
+  let conversionStart: number;
   try {
     await new Promise((resolve, reject) => {
       //TODO: sanitization???
@@ -133,14 +132,16 @@ export default async (req: Request): Promise<Response> => {
         .outputFormat("mp4")
         .outputOptions("-shortest")
         .on("start", (commandLine: string) => {
+          conversionStart = Date.now();
           console.log("Spawned Ffmpeg with command: " + commandLine);
         })
-        .on("progress", (e) => {
-          console.log(e);
+        .on("progress", () => {
+          const fileSize = Buffer.concat(chunks).length;
+          if (fileSize > max_size) {
+            reject("413");
+          }
         })
         .on("end", () => {
-          console.log("Processing finished successfully");
-          console.log(`FFMPEG Time taken ${Date.now() - start}ms`);
           resolve(true);
         })
         .on("error", (err: Error) => {
@@ -151,6 +152,9 @@ export default async (req: Request): Promise<Response> => {
         .run();
     });
   } catch (error) {
+    if (error === "413") {
+      return new Response(null, { status: 413 });
+    }
     return new Response(String(error), { status: 500 });
   }
   const conversionEnd = Date.now();
@@ -160,53 +164,54 @@ export default async (req: Request): Promise<Response> => {
   try {
     const headers = new Headers();
     headers.append("Content-Type", "video/mp4");
-    headers.append("Conversion-Time", String(conversionEnd - conversionStart));
+    headers.append("Conversion-Time", String(conversionEnd - conversionStart!));
 
     return new Response(fileBuffer, { headers });
   } finally {
-    console.log(`Time taken ${Date.now() - start}ms`);
-    //TODO: logs
-    createItem(ServeItem.ConversionLogs, {
-      audio_format: json.logs.audio_format,
-      conversion_time: conversionEnd - conversionStart,
-      date_created: json.logs.date_created,
-      file_duration: 0,
-      file_name: json.logs.file_name,
-      guild_id: json.logs.guild_id,
-      input_bitrate: 0,
-      input_size,
-      output_bitrate: 0,
-      output_size: fileSize,
-      user_id: json.logs.user_id,
-      cached: false,
-      type: json.logs.type,
-    });
+    if (env === "production") {
+      //TODO: logs
+      createItem(ServeItem.ConversionLogs, {
+        audio_format: json.logs.audio_format,
+        conversion_time: conversionEnd - conversionStart!,
+        date_created: json.logs.date_created,
+        file_duration: 0,
+        file_name: json.logs.file_name,
+        guild_id: json.logs.guild_id,
+        input_bitrate: 0,
+        input_size,
+        output_bitrate: 0,
+        output_size: fileSize,
+        user_id: json.logs.user_id,
+        cached: false,
+        type: json.logs.type,
+      });
 
-    const formData = new FormData();
-    const fileBlob = new Blob([fileBuffer]);
-    formData.append("file", fileBlob, "audio.mp4");
-    formData.append(
-      "payload_json",
-      JSON.stringify({
-        content: "Test",
-      }),
-    );
-    //cache the converted file
-    fetch(
-      `https://discord.com/api/v10/channels/${
-        Deno.env.get(
-          "CACHE_CHANNEL",
-        )
-      }/messages`,
-      {
-        method: "POST",
-        headers: {
-          "User-Agent": "DiscordBot (null, v0)",
-          Authorization: `Bot ${Deno.env.get("BOT_TOKEN")}`,
+      const formData = new FormData();
+      const fileBlob = new Blob([fileBuffer]);
+      formData.append("file", fileBlob, "audio.mp4");
+      formData.append(
+        "payload_json",
+        JSON.stringify({
+          content: "Test",
+        }),
+      );
+      //cache the converted file
+      fetch(
+        `https://discord.com/api/v10/channels/${
+          Deno.env.get(
+            "CACHE_CHANNEL",
+          )
+        }/messages`,
+        {
+          method: "POST",
+          headers: {
+            "User-Agent": "DiscordBot (null, v0)",
+            Authorization: `Bot ${Deno.env.get("BOT_TOKEN")}`,
+          },
+          body: formData,
         },
-        body: formData,
-      },
-    );
-    //TODO: store file "cache" in db
+      );
+      //TODO: store file "cache" in db
+    }
   }
 };

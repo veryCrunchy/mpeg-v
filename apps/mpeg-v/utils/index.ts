@@ -1,4 +1,5 @@
 import type { TableNames, TableSchemas } from "@mpeg-v/types";
+import { BoostTierFileLimit } from "@mpeg-v/types";
 export const Authorization = `Bearer ${Deno.env.get("API_TOKEN")}`;
 
 export async function createItem<T extends TableNames>(
@@ -23,3 +24,13 @@ export async function createItem<T extends TableNames>(
     console.error(`Create ${item} Error:`, e);
   }
 }
+
+export const determineSizeLimit = (boostTier: number): number => {
+  const tiers = [
+    BoostTierFileLimit.Default,
+    BoostTierFileLimit.Default,
+    BoostTierFileLimit.Tier2,
+    BoostTierFileLimit.Tier3,
+  ];
+  return tiers[boostTier];
+};

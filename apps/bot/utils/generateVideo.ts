@@ -1,5 +1,5 @@
 import { ConversionLogs, GenerateVideoRequest } from "@mpeg-v/types";
-import { Authorization } from "@mpeg-v/utils";
+import { Authorization, determineSizeLimit } from "@mpeg-v/utils";
 import { AttachmentBuilder } from "seyfert";
 import { Context, File } from "utils/types.ts";
 import { ALLOWED_EXTENSIONS } from "utils/general.ts";
@@ -60,10 +60,17 @@ export async function generateVideo(
 
   if (res.status == 413) {
     throw new Error(
-      "File size is too large, please try again with a smaller file", //TODO: Promote Pro Plan
+      "File size is too large",
+      {
+        cause: `File size exceeds ${
+          guild ? "this guilds" : "discords"
+        } upload limit of \`${
+          determineSizeLimit(guild?.premiumTier || 0) / 1024 / 1024
+        }MB\``,
+      }, //TODO: Promote Pro Plan
     );
   }
-  
+
   if (res.ok && res.body) {
     const attachment = new AttachmentBuilder({
       type: "buffer",
@@ -73,6 +80,8 @@ export async function generateVideo(
 
     return [attachment, res];
   } else {
-    throw new Error("Failed to generate video");
+    throw new Error("Failed to generate video", {
+      cause: res.statusText,
+    });
   }
 }

@@ -1,8 +1,13 @@
 import type { ConversionLogs } from "./database.ts";
 
+export enum BoostTierFileLimit {
+  Default = 10 * 1024 * 1024, // 10MB
+  Tier2 = 50 * 1024 * 1024, // 50MB
+  Tier3 = 100 * 1024 * 1024, // 100MB
+}
 export interface GenerateVideoRequest {
   url: string;
-  limit: number;
+  tier_limit: number;
   logs: Omit<
     ConversionLogs,
     | "cached"
@@ -13,5 +18,4 @@ export interface GenerateVideoRequest {
     | "output_bitrate"
     | "output_size"
   >;
-  limit: number;
 }
