@@ -34,7 +34,7 @@ export async function generateVideo(
   ctx: Context,
   type: ConversionLogs["type"],
   sizeLimit: number,
-): Promise<[AttachmentBuilder | null, Response]> {
+): Promise<[AttachmentBuilder, Response]> {
   const extension = file.filename.split(".").pop()!;
   const data: GenerateVideoRequest = {
     url: file.url,
@@ -57,6 +57,12 @@ export async function generateVideo(
     body: JSON.stringify(data),
   });
 
+  if (res.status == 413) {
+    throw new Error(
+      "File size is too large, please try again with a smaller file", //TODO: Promote Pro Plan
+    );
+  }
+  
   if (res.ok && res.body) {
     const attachment = new AttachmentBuilder({
       type: "buffer",
@@ -66,6 +72,6 @@ export async function generateVideo(
 
     return [attachment, res];
   } else {
-    return [null, res];
+    throw new Error("Failed to generate video");
   }
 }

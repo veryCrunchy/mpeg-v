@@ -48,13 +48,6 @@ class Video extends SubCommand {
       guild?.premiumTier || 0,
     );
 
-    if (res.status == 413) {
-      throw new Error(
-        "File size is too large, please try again with a smaller file",
-      );
-    }
-    if (!res.ok || !attachment) throw new Error("Failed to generate video");
-
     const conversionTime = res.headers.get("Conversion-Time");
     return ctx.editOrReply({
       content: `\`${audio.filename} (${
