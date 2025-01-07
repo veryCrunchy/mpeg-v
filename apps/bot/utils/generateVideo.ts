@@ -4,7 +4,7 @@ import { AttachmentBuilder } from "seyfert";
 import { Context, File } from "utils/types.ts";
 import { ALLOWED_EXTENSIONS } from "utils/general.ts";
 
-export function filterFiles(files: File[], ctx: Context): File[] | null {
+export function filterFiles(files: File[]): File[] | null {
   const filteredFiles = files.filter((file) => {
     const extension = file.filename.split(".").pop();
     return extension && ALLOWED_EXTENSIONS.includes(extension);
@@ -33,9 +33,10 @@ export async function generateVideo(
   file: File,
   ctx: Context,
   type: ConversionLogs["type"],
-  sizeLimit: number,
 ): Promise<[AttachmentBuilder, Response]> {
   const extension = file.filename.split(".").pop()!;
+  const guild = await ctx.guild();
+
   const data: GenerateVideoRequest = {
     url: file.url,
     logs: {
@@ -46,7 +47,7 @@ export async function generateVideo(
       audio_format: extension,
       file_name: file.filename,
     },
-    limit: sizeLimit,
+    tier_limit: guild?.premiumTier || 0,
   };
   const res = await fetch(Deno.env.get("STREAM") + "/generate", {
     headers: {

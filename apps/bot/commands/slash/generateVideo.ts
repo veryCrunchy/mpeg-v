@@ -7,13 +7,13 @@ import {
   Options,
   SubCommand,
 } from "seyfert";
-import { embed, handleError } from "utils/embed.ts";
+import { handleError } from "utils/embed.ts";
 import { ALLOWED_EXTENSIONS } from "utils/general.ts";
 import {
   filterFiles,
   formatFileSize,
   generateVideo,
-} from "utils/videoUtils.ts";
+} from "utils/generateVideo.ts";
 
 const options = {
   file: createAttachmentOption({
@@ -35,17 +35,15 @@ class Video extends SubCommand {
   override async run(ctx: CommandContext<typeof options>) {
     const audio = ctx.options.file;
 
-    const filteredFiles = filterFiles([audio], ctx);
+    const filteredFiles = filterFiles([audio]);
     if (!filteredFiles) return;
 
     await ctx.deferReply(!!ctx.options.private);
 
-    const guild = await ctx.guild();
     const [attachment, res] = await generateVideo(
       audio,
       ctx,
       "slash",
-      guild?.premiumTier || 0,
     );
 
     const conversionTime = res.headers.get("Conversion-Time");

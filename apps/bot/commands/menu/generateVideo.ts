@@ -4,9 +4,9 @@ import {
   MenuCommandContext,
   MessageCommandInteraction,
 } from "seyfert";
-import { embed, handleError } from "utils/embed.ts";
+import { handleError } from "utils/embed.ts";
 import { ApplicationCommandType } from "seyfert/lib/types/index.js";
-import { filterFiles, generateVideo } from "utils/videoUtils.ts";
+import { filterFiles, generateVideo } from "utils/generateVideo.ts";
 
 @Declare({
   name: "Generate Video",
@@ -24,17 +24,14 @@ export default class GenerateVideo extends ContextMenuCommand {
       );
     }
 
-    const filteredFiles = filterFiles(files, ctx);
+    const filteredFiles = filterFiles(files);
     if (!filteredFiles) return;
-
-    const guild = await ctx.guild();
 
     for (const file of filteredFiles) {
       const [attachment, res] = await generateVideo(
         file,
         ctx,
         "menu",
-        guild?.premiumTier || 0,
       );
 
       const conversionTime = res.headers.get("Conversion-Time");
