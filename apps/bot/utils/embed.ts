@@ -1,5 +1,4 @@
-import { CommandContext, Embed, MenuCommandContext } from "seyfert";
-import { MessageFlags } from "seyfert/lib/types/index.js";
+import { Embed } from "seyfert";
 import { ColorResolvable } from "seyfert/lib/common/types/resolvables.js";
 
 export const COLORS: { [key: string]: ColorResolvable } = {
@@ -23,21 +22,4 @@ export const embed = ({
   return new Embed().setColor(color || COLORS[status || "default"])
     .setDescription(message)
     .setTitle(title);
-};
-
-export const handleError = (
-  ctx: MenuCommandContext<any, never> | CommandContext,
-  error: unknown,
-) => {
-  return ctx.editOrReply({
-    embeds: [
-      embed({
-        message: error instanceof Error
-          ? `Error: ${error.message}`
-          : `Error: ${error}`,
-        status: "error",
-      }),
-    ],
-    flags: MessageFlags.Ephemeral,
-  });
 };

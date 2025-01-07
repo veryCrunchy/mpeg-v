@@ -7,7 +7,7 @@ import {
   Options,
   SubCommand,
 } from "seyfert";
-import { handleError } from "utils/embed.ts";
+import { handleError } from "utils/error.ts";
 import { ALLOWED_EXTENSIONS } from "utils/general.ts";
 import {
   filterFiles,
@@ -56,7 +56,7 @@ class Video extends SubCommand {
     });
   }
 
-  override onRunError(ctx: CommandContext, error: unknown) {
+  override onRunError(ctx: CommandContext, error: Error) {
     return handleError(ctx, error);
   }
 }

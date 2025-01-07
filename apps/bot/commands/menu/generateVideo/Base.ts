@@ -3,7 +3,7 @@ import {
   MenuCommandContext,
   MessageCommandInteraction,
 } from "seyfert";
-import { handleError } from "utils/embed.ts";
+import { handleError } from "utils/error.ts";
 import { filterFiles, generateVideo } from "utils/generateVideo.ts";
 
 export class GenerateVideoBase extends ContextMenuCommand {
@@ -37,7 +37,7 @@ export class GenerateVideoBase extends ContextMenuCommand {
     }
   }
 
-  override onRunError(ctx: MenuCommandContext<MessageCommandInteraction>, error: unknown) {
+  override onRunError(ctx: MenuCommandContext<MessageCommandInteraction>, error: Error) {
     return handleError(ctx, error);
   }
 }
