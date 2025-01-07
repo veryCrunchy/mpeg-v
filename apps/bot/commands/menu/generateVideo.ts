@@ -45,7 +45,7 @@ export default class GenerateVideo extends ContextMenuCommand {
     }
   }
 
-  override onRunError(ctx: MenuCommandContext<any, never>, error: unknown) {
+  override onRunError(ctx: MenuCommandContext<MessageCommandInteraction>, error: unknown) {
     return handleError(ctx, error);
   }
 }
