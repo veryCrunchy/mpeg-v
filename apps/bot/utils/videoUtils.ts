@@ -13,7 +13,8 @@ export function filterFiles(files: File[], ctx: Context): File[] | null {
 	if (filteredFiles.length === 0) {
 		throw new Error(
 			'Unsupported file type, must be one of the following types:\n`' +
-				ALLOWED_EXTENSIONS.join(', ') + '`',
+				ALLOWED_EXTENSIONS.join(', ') +
+				'`',
 		);
 	} else return filteredFiles;
 }
@@ -56,7 +57,7 @@ export async function generateVideo(
 		body: JSON.stringify(data),
 	});
 
-	if (res.ok) {
+	if (res.ok && res.body) {
 		const attachment = new AttachmentBuilder({
 			type: 'buffer',
 			resolvable: res.body,
