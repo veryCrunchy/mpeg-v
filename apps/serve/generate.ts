@@ -38,7 +38,8 @@ export default async (req: Request): Promise<Response> => {
       callback();
     },
   });
-  const codec = "copy"; // aac
+  const codec = "aac"; // aac or copy
+  //TODO: codec issues with ogg
   let conversionStart: number;
   try {
     await new Promise((resolve, reject) => {
