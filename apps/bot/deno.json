@@ -1,22 +1,14 @@
 {
-	"tasks": {
-		"dev": "deno run --env-file --allow-sys --allow-net --allow-env --allow-read --allow-write --watch main.ts",
-		"start": "deno run --env-file --allow-sys --allow-net --allow-env --allow-read --allow-write main.ts",
-		"start:docker": "docker run mpeg-v-bot"
-	},
-	"imports": {
-		"@mpeg-v/utils": "../mpeg-v/utils/index.ts",
-		"@mpeg-v/types": "../mpeg-v/types/index.ts",
-		"utils/": "./utils/",
-		"@std/assert": "jsr:@std/assert@1",
-		"seyfert": "npm:seyfert@dev"
-	},
-	"fmt": {
-		"useTabs": true,
-		"lineWidth": 100,
-		"indentWidth": 8,
-		"semiColons": true,
-		"singleQuote": true,
-		"proseWrap": "preserve"
-	}
+  "tasks": {
+    "dev": "deno run --env-file --allow-sys --allow-net --allow-env --allow-read --allow-write --watch main.ts",
+    "start": "deno run --env-file --allow-sys --allow-net --allow-env --allow-read --allow-write main.ts",
+    "start:docker": "docker run mpeg-v-bot"
+  },
+  "imports": {
+    "@mpeg-v/utils": "../mpeg-v/utils/index.ts",
+    "@mpeg-v/types": "../mpeg-v/types/index.ts",
+    "utils/": "./utils/",
+    "@std/assert": "jsr:@std/assert@1",
+    "seyfert": "npm:seyfert@dev"
+  }
 }

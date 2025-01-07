@@ -1,7 +1,7 @@
 import {
-  MessageCommandInteraction,
   CommandContext,
   MenuCommandContext,
+  MessageCommandInteraction,
 } from "seyfert";
 
 export type File = {

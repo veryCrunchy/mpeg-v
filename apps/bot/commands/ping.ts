@@ -1,4 +1,4 @@
-import { Declare, Command, type CommandContext } from "seyfert";
+import { Command, type CommandContext, Declare } from "seyfert";
 import { MessageFlags } from "seyfert/lib/types/index.js";
 
 @Declare({

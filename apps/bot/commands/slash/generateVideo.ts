@@ -1,73 +1,77 @@
 import {
-	Command,
-	type CommandContext,
-	createAttachmentOption,
-	createBooleanOption,
-	Declare,
-	Options,
-	SubCommand,
-} from 'seyfert';
-import { embed, handleError } from 'utils/embed.ts';
-import { ALLOWED_EXTENSIONS } from 'utils/general.ts';
-import { filterFiles, formatFileSize, generateVideo } from 'utils/videoUtils.ts';
+  Command,
+  type CommandContext,
+  createAttachmentOption,
+  createBooleanOption,
+  Declare,
+  Options,
+  SubCommand,
+} from "seyfert";
+import { embed, handleError } from "utils/embed.ts";
+import { ALLOWED_EXTENSIONS } from "utils/general.ts";
+import {
+  filterFiles,
+  formatFileSize,
+  generateVideo,
+} from "utils/videoUtils.ts";
 
 const options = {
-	file: createAttachmentOption({
-		description: `The audio file to convert (${ALLOWED_EXTENSIONS.join(', ')})`,
-		required: true,
-	}),
-	private: createBooleanOption({
-		description: "If you don't want the message to be visible to others",
-		required: false,
-	}),
+  file: createAttachmentOption({
+    description: `The audio file to convert (${ALLOWED_EXTENSIONS.join(", ")})`,
+    required: true,
+  }),
+  private: createBooleanOption({
+    description: "If you don't want the message to be visible to others",
+    required: false,
+  }),
 };
 @Declare({
-	name: 'video',
-	description: 'Generate a video from an audio file',
-	integrationTypes: ['GuildInstall', 'UserInstall'],
+  name: "video",
+  description: "Generate a video from an audio file",
+  integrationTypes: ["GuildInstall", "UserInstall"],
 })
 @Options(options)
 class Video extends SubCommand {
-	override async run(ctx: CommandContext<typeof options>) {
-		const audio = ctx.options.file;
+  override async run(ctx: CommandContext<typeof options>) {
+    const audio = ctx.options.file;
 
-		const filteredFiles = filterFiles([audio], ctx);
-		if (!filteredFiles) return;
+    const filteredFiles = filterFiles([audio], ctx);
+    if (!filteredFiles) return;
 
-		await ctx.deferReply(!!ctx.options.private);
+    await ctx.deferReply(!!ctx.options.private);
 
-		const guild = await ctx.guild();
-		const [attachment, res] = await generateVideo(
-			audio,
-			ctx,
-			'slash',
-			guild?.premiumTier || 0,
-		);
+    const guild = await ctx.guild();
+    const [attachment, res] = await generateVideo(
+      audio,
+      ctx,
+      "slash",
+      guild?.premiumTier || 0,
+    );
 
-		if (res.status == 413) {
-			throw new Error(
-				'File size is too large, please try again with a smaller file',
-			);
-		}
-		if (!res.ok || !attachment) throw new Error('Failed to generate video');
+    if (res.status == 413) {
+      throw new Error(
+        "File size is too large, please try again with a smaller file",
+      );
+    }
+    if (!res.ok || !attachment) throw new Error("Failed to generate video");
 
-		const conversionTime = res.headers.get('Conversion-Time');
-		return ctx.editOrReply({
-			content: `\`${audio.filename} (${
-				formatFileSize(audio.size)
-			})\`\n-# Completed in ${Number(conversionTime) / 1000} seconds`,
-			files: [attachment],
-		});
-	}
+    const conversionTime = res.headers.get("Conversion-Time");
+    return ctx.editOrReply({
+      content: `\`${audio.filename} (${
+        formatFileSize(audio.size)
+      })\`\n-# Completed in ${Number(conversionTime) / 1000} seconds`,
+      files: [attachment],
+    });
+  }
 
-	override onRunError(ctx: CommandContext, error: unknown) {
-		return handleError(ctx, error);
-	}
+  override onRunError(ctx: CommandContext, error: unknown) {
+    return handleError(ctx, error);
+  }
 }
 
 @Declare({
-	name: 'generate',
-	description: 'Generate ...',
+  name: "generate",
+  description: "Generate ...",
 })
 @Options([Video])
 export default class ParentCommand extends Command {}
