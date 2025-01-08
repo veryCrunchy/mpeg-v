@@ -16,4 +16,7 @@ Deno.env.set("START_TIME", Date.now().toString());
 
 declare module "seyfert" {
   interface UsingClient extends ParseClient<WorkerClient<true>> {}
+  interface ExtendedRC {
+    production: boolean;
+  }
 }
