@@ -1,11 +1,15 @@
-# FROM jrottenberg/ffmpeg:7.1-alpine AS ffmpeg
+FROM jrottenberg/ffmpeg:4.4-scratch AS ffmpeg
 
-FROM denoland/deno:alpine-2.1.4
+FROM denoland/deno:2.1.4
 
-RUN apk update && apk upgrade && \
-    apk add --no-cache ffmpeg ffmpeg-libs libgcc && \
-    rm -f /usr/local/lib/libgcc_s.so.1 && \
-    apk add --no-cache libgcc
+COPY --from=ffmpeg /bin/ffmpeg /bin/ffprobe /usr/local/bin/
+COPY --from=ffmpeg /lib /lib
+COPY --from=ffmpeg /share /share
+
+# RUN apk update && apk upgrade && \
+#     apk add --no-cache ffmpeg ffmpeg-libs libgcc && \
+#     rm -f /usr/local/lib/libgcc_s.so.1 && \
+#     apk add --no-cache libgcc
 
 WORKDIR /app
 
