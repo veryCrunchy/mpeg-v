@@ -6,7 +6,7 @@ import { createItem, determineSizeLimit } from "@mpeg-v/utils";
 import { GenerateVideoRequest, ServeItem } from "@mpeg-v/types";
 const env = Deno.env.get("ENV");
 export default async (req: Request): Promise<Response> => {
-  const colors = [`0x1e1f22`, `0xfc7828`, `0x9cf42f`];
+  const colors = [`0x1e1f22`, `0xfe7fff`, `0xfc7828`];
   const [width, height] = [250, 100];
   // const bitrate = "320";
   const json: GenerateVideoRequest = await req.json();
@@ -65,6 +65,18 @@ export default async (req: Request): Promise<Response> => {
             inputs: "1:a",
             outputs: "line",
           },
+          // {
+          //   filter: "showspectrum",
+          //   options: `s=${width}x${height}:mode=separate:scale=lin:overlap=0.875:color=channel:slide=fullframe:data=phase`,
+          //   inputs: "1:a",
+          //   outputs: "line",
+          // },
+          // {
+          //   filter: "avectorscope",
+          //   options: `s=${width}x${height}`,
+          //   inputs: "1:a",
+          //   outputs: "line",
+          // },
           //overlay line waveform on top of color background
           {
             filter: "overlay",
@@ -129,6 +141,7 @@ export default async (req: Request): Promise<Response> => {
         .outputOptions("-preset veryfast")
         .audioCodec(codec)
         .audioBitrate("192k")
+        // .videoBitrate("100")
         .outputOptions(["-movflags frag_keyframe+empty_moov+faststart"]) // magic line to make it streamable, DO NOT TOUCH!!!
         .outputFormat("mp4")
         .outputOptions("-shortest")
@@ -170,7 +183,6 @@ export default async (req: Request): Promise<Response> => {
     return new Response(fileBuffer, { headers });
   } finally {
     if (env === "production") {
-      //TODO: logs
       createItem(ServeItem.ConversionLogs, {
         audio_format: json.logs.audio_format,
         conversion_time: conversionEnd - conversionStart!,
@@ -187,31 +199,26 @@ export default async (req: Request): Promise<Response> => {
         type: json.logs.type,
       });
 
-      const formData = new FormData();
-      const fileBlob = new Blob([fileBuffer]);
-      formData.append("file", fileBlob, "audio.mp4");
-      formData.append(
-        "payload_json",
-        JSON.stringify({
-          content: "Test",
-        }),
-      );
+      // const formData = new FormData();
+      // const fileBlob = new Blob([fileBuffer]);
+      // formData.append("file", fileBlob, "audio.mp4");
       //cache the converted file
-      fetch(
-        `https://discord.com/api/v10/channels/${
-          Deno.env.get(
-            "CACHE_CHANNEL",
-          )
-        }/messages`,
-        {
-          method: "POST",
-          headers: {
-            "User-Agent": "DiscordBot (null, v0)",
-            Authorization: `Bot ${Deno.env.get("BOT_TOKEN")}`,
-          },
-          body: formData,
-        },
-      );
+      // TODO: add audio caching to privacy policy
+      // fetch(
+      //   `https://discord.com/api/v10/channels/${
+      //     Deno.env.get(
+      //       "CACHE_CHANNEL",
+      //     )
+      //   }/messages`,
+      //   {
+      //     method: "POST",
+      //     headers: {
+      //       "User-Agent": "DiscordBot (null, v0)",
+      //       Authorization: `Bot ${Deno.env.get("BOT_TOKEN")}`,
+      //     },
+      //     body: formData,
+      //   },
+      // );
       //TODO: store file "cache" in db
     }
   }
