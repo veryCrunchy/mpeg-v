@@ -5,7 +5,7 @@ const production = ["prod", "production"].includes(
 );
 export default config.bot({
   token: Deno.env.get("CLIENT_TOKEN") ?? "",
-  intents: ["Guilds", "MessageContent", "GuildMessages"],
+  intents: ["Guilds"], //"MessageContent", "GuildMessages"
   debug: !production,
   production,
   locations: {
