@@ -34,12 +34,11 @@ const options = {
 class Video extends SubCommand {
   override async run(ctx: CommandContext<typeof options>) {
     await ctx.deferReply(!!ctx.options.private);
-    
+
     const audio = ctx.options.file;
 
     const filteredFiles = filterFiles([audio]);
     if (!filteredFiles) return;
-
 
     const [attachment, res] = await generateVideo(
       audio,
@@ -56,8 +55,8 @@ class Video extends SubCommand {
     });
   }
 
-  override onRunError(ctx: CommandContext, error: Error) {
-    return handleError(ctx, error);
+  override onRunError(ctx: CommandContext<typeof options>, error: Error) {
+    return handleError(ctx, error, !!ctx.options.private);
   }
 }
 
