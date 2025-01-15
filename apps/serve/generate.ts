@@ -2,6 +2,7 @@
 import ffmpeg from "npm:fluent-ffmpeg";
 import { Readable, Writable } from "node:stream";
 import { Buffer } from "node:buffer";
+import { NodeReadableStream } from "node:stream/web";
 import { createItem, determineSizeLimit } from "@mpeg-v/utils";
 import { GenerateVideoRequest, ServeItem } from "@mpeg-v/types";
 const env = Deno.env.get("ENV");
@@ -17,20 +18,9 @@ export default async (req: Request): Promise<Response> => {
   }
   const input_size = Number(file.headers.get("content-length"));
   const max_size = determineSizeLimit(json.tier_limit);
-  const nodeReadableStream = new Readable({
-    async read() {
-      const reader = file.body!.getReader();
-      let done, value;
-      while (!done) {
-        ({ done, value } = await reader.read());
-        if (value) {
-          this.push(Buffer.from(value));
-        }
-      }
-      this.push(null);
-    },
-  });
-
+  const nodeReadableStream = Readable.fromWeb(
+    file.body as NodeReadableStream,
+  );
   const chunks: Uint8Array[] = [];
   const output = new Writable({
     write(chunk, _, callback) {
@@ -43,7 +33,6 @@ export default async (req: Request): Promise<Response> => {
   let conversionStart: number;
   try {
     await new Promise((resolve, reject) => {
-      //TODO: sanitization???
       ffmpeg()
         .input(`color=c=${colors[0]}:s=${width}x${height}`)
         .inputOptions("-f", "lavfi")
@@ -142,7 +131,7 @@ export default async (req: Request): Promise<Response> => {
         .audioCodec(codec)
         .audioBitrate("192k")
         // .videoBitrate("100")
-        .outputOptions(["-movflags frag_keyframe+empty_moov+faststart"]) // magic line to make it streamable, DO NOT TOUCH!!!
+        .outputOptions(["-movflags frag_keyframe+empty_moov+faststart"]) // magic line to make it stream-able, DO NOT TOUCH!!!
         .outputFormat("mp4")
         .outputOptions("-shortest")
         .on("start", (commandLine: string) => {
@@ -190,9 +179,9 @@ export default async (req: Request): Promise<Response> => {
         file_duration: 0,
         file_name: json.logs.file_name,
         guild_id: json.logs.guild_id,
-        input_bitrate: 0,
+        input_bitrate: 0, //TODO: IMPORTANT
         input_size,
-        output_bitrate: 0,
+        output_bitrate: 0, //TODO: IMPORTANT
         output_size: fileSize,
         user_id: json.logs.user_id,
         cached: false,
