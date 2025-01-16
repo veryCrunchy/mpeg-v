@@ -1,15 +1,22 @@
 import { WebhookMessage } from "seyfert";
-import { AnyContext, Embed } from "seyfert";
+import {  } from "seyfert";
+import { AnyContext, Embed, Message } from "seyfert";
 import { MessageFlags } from "seyfert/lib/types/index.js";
 import { COLORS } from "utils/embed.ts";
 
 export const handleError = (
-  ctx: AnyContext,
+  ctx: AnyContext | Message,
   error: Error,
   ephemeral?: boolean,
 ) => {
   console.log(Error);
-  ctx.editOrReply({
+  let reply;
+  if (ctx instanceof Message) {
+    reply = ctx.reply;
+  } else {
+    reply = ctx.editOrReply;
+  }
+  reply({
     embeds: [
       new Embed().setColor(COLORS["error"])
         .setTitle(

@@ -1,13 +1,18 @@
 import { ConversionLogs, GenerateVideoRequest } from "@mpeg-v/types";
 import { Authorization, determineSizeLimit } from "@mpeg-v/utils";
-import { AttachmentBuilder } from "seyfert";
-import { Context, File } from "utils/types.ts";
+import {
+  AttachmentBuilder,
+  Message,
+  MessageCommandInteraction,
+} from "seyfert";
 import { ALLOWED_EXTENSIONS } from "utils/general.ts";
+import { CommandContext, MenuCommandContext } from "seyfert";
 
-export function filterFiles(files: File[]): File[] | null {
+export function filterAudioFiles<T extends { filename: string }>(
+  files: T[],
+): T[] | null {
   const filteredFiles = files.filter((file) => {
-    const extension = file.filename.split(".").pop();
-    return extension && ALLOWED_EXTENSIONS.includes(extension);
+    return isValidAudioFile(file.filename);
   });
 
   if (filteredFiles.length === 0) {
@@ -16,7 +21,15 @@ export function filterFiles(files: File[]): File[] | null {
         ALLOWED_EXTENSIONS.join(", ") +
         "`",
     );
-  } else return filteredFiles;
+  }
+
+  return filteredFiles;
+}
+
+export function isValidAudioFile(filename: string): boolean {
+  const extension = filename.split(".").pop();
+  console.log(extension, filename)
+  return ALLOWED_EXTENSIONS.includes(extension!);
 }
 
 export function formatFileSize(size: number): string {
@@ -30,19 +43,26 @@ export function formatFileSize(size: number): string {
 }
 
 export async function generateVideo(
-  file: File,
-  ctx: Context,
+  file: { filename: string; url: string; id: string },
+  ctx: CommandContext | MenuCommandContext<MessageCommandInteraction> | Message,
   type: ConversionLogs["type"],
 ): Promise<[AttachmentBuilder, Response]> {
   const extension = file.filename.split(".").pop()!;
   const guild = await ctx.guild();
 
+  let date_created;
+  if (ctx instanceof Message) {
+    date_created = ctx.createdAt;
+  } else {
+    date_created = ctx.interaction.createdAt;
+  }
+
   const data: GenerateVideoRequest = {
     url: file.url,
     logs: {
       user_id: ctx.author.id,
-      guild_id: ctx.guildId ?? null,
-      date_created: ctx.interaction.createdAt,
+      guild_id: ctx.guildId ?? "DM",
+      date_created,
       type,
       audio_format: extension,
       file_name: file.filename,

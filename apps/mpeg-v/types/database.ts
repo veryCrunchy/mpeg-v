@@ -18,7 +18,7 @@ export interface ConversionLogs {
   output_bitrate: number;
   audio_format: string;
   user_id: string;
-  guild_id: string | null;
+  guild_id: string | "DM";
   cached: boolean;
 }
 

@@ -4,7 +4,7 @@ import {
   MessageCommandInteraction,
 } from "seyfert";
 import { handleError } from "utils/error.ts";
-import { filterFiles, generateVideo } from "utils/generateVideo.ts";
+import { filterAudioFiles, generateVideo } from "utils/generateVideo.ts";
 
 export class GenerateVideoBase extends ContextMenuCommand {
   async run(ctx: MenuCommandContext<MessageCommandInteraction>) {
@@ -16,7 +16,7 @@ export class GenerateVideoBase extends ContextMenuCommand {
       );
     }
 
-    const filteredFiles = filterFiles(files);
+    const filteredFiles = filterAudioFiles(files);
     if (!filteredFiles) return;
 
     for (const file of filteredFiles) {

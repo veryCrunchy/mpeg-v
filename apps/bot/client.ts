@@ -1,6 +1,16 @@
 import { ParseClient, WorkerAdapter, WorkerClient } from "seyfert";
 
-const client = new WorkerClient({});
+const client = new WorkerClient({
+  commands: {
+    prefix: (msg) => {
+      return ["mv", ".v"];
+    },
+    reply: (ctx) => true,
+    // deferReplyResponse: (ctx) => ({
+    //   content: "Please wait, processing your request...",
+    // }),
+  },
+});
 
 client.setServices({
   cache: {
