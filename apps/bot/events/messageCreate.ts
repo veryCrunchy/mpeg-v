@@ -4,7 +4,7 @@ import { filterAudioFiles, generateVideo } from "utils/generateVideo.ts";
 
 export default createEvent({
   data: { name: "messageCreate" },
-  async run(message, client) {
+  async run(message) {
     const audio = message.attachments;
     console.log(audio);
     let filteredFiles;
@@ -22,9 +22,8 @@ export default createEvent({
       );
       const conversionTime = res.headers.get("Conversion-Time");
       return message.reply({
-        content: `\`${file.filename} \`\n-# Completed in ${
-          Number(conversionTime) / 1000
-        } seconds`,
+        content: `\`${file.filename} \`\n-# Completed in ${Number(conversionTime) / 1000
+          } seconds`,
         files: [attachment],
       });
     }

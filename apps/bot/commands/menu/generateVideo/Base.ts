@@ -3,7 +3,6 @@ import {
   MenuCommandContext,
   MessageCommandInteraction,
 } from "seyfert";
-import { handleError } from "utils/error.ts";
 import { filterAudioFiles, generateVideo } from "utils/generateVideo.ts";
 
 export class GenerateVideoBase extends ContextMenuCommand {
@@ -29,15 +28,10 @@ export class GenerateVideoBase extends ContextMenuCommand {
       const conversionTime = res.headers.get("Conversion-Time");
       console.log(ctx.interaction);
       return ctx.editOrReply({
-        content: `\`${file.filename}\` ${ctx.target.url}\n-# Completed in ${
-          Number(conversionTime) / 1000
-        } seconds`,
+        content: `\`${file.filename}\` ${ctx.target.url}\n-# Completed in ${Number(conversionTime) / 1000
+          } seconds`,
         files: [attachment],
       });
     }
-  }
-
-  override onRunError(ctx: MenuCommandContext<MessageCommandInteraction>, error: Error) {
-    return handleError(ctx, error);
   }
 }

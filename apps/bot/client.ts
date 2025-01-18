@@ -1,14 +1,20 @@
 import { ParseClient, WorkerAdapter, WorkerClient } from "seyfert";
+import { handleError } from "utils/error.ts";
 
 const client = new WorkerClient({
   commands: {
-    prefix: (msg) => {
+    prefix: () => {
       return ["mv", ".v"];
     },
-    reply: (ctx) => true,
+    reply: () => true,
     // deferReplyResponse: (ctx) => ({
     //   content: "Please wait, processing your request...",
     // }),
+    defaults: {
+      onRunError(ctx, error) {
+        return handleError(ctx, error)
+      }
+    }
   },
 });
 
@@ -25,8 +31,13 @@ await client
 Deno.env.set("START_TIME", Date.now().toString());
 
 declare module "seyfert" {
-  interface UsingClient extends ParseClient<WorkerClient<true>> {}
+  interface UsingClient extends ParseClient<WorkerClient<true>> { }
   interface ExtendedRC {
     production: boolean;
+  }
+
+  interface InternalOptions {
+    asyncCache: true // because you are using WorkerAdapter
+    withPrefix: true // because you have "prefix" callback
   }
 }

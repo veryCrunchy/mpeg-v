@@ -8,7 +8,6 @@ import {
   Options,
   SubCommand,
 } from "seyfert";
-import { handleError } from "utils/error.ts";
 import { ALLOWED_EXTENSIONS } from "utils/general.ts";
 import {
   generateVideo,
@@ -49,15 +48,10 @@ class Video extends SubCommand {
 
     const conversionTime = res.headers.get("Conversion-Time");
     return ctx.editOrReply({
-      content: `\`${audio.filename}\`\n-# Completed in ${
-        Number(conversionTime) / 1000
-      } seconds`,
+      content: `\`${audio.filename}\`\n-# Completed in ${Number(conversionTime) / 1000
+        } seconds`,
       files: [attachment],
     });
-  }
-
-  override onRunError(ctx: CommandContext<typeof options>, error: Error) {
-    return handleError(ctx, error, !!ctx.options.private);
   }
 }
 
@@ -66,4 +60,4 @@ class Video extends SubCommand {
   description: "Generate ...",
 })
 @Options([Video])
-export default class ParentCommand extends Command {}
+export default class ParentCommand extends Command { }
