@@ -3,7 +3,6 @@ import {
   MenuCommandContext,
   MessageCommandInteraction,
 } from "seyfert";
-import { handleError } from "utils/error.ts";
 import { filterAudioFiles, generateVideo } from "utils/generateVideo.ts";
 
 export class GenerateVideoBase extends ContextMenuCommand {
@@ -35,9 +34,5 @@ export class GenerateVideoBase extends ContextMenuCommand {
         files: [attachment],
       });
     }
-  }
-
-  override onRunError(ctx: MenuCommandContext<MessageCommandInteraction>, error: Error) {
-    return handleError(ctx, error);
   }
 }

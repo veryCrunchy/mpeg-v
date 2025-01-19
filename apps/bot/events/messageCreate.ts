@@ -4,7 +4,7 @@ import { filterAudioFiles, generateVideo } from "utils/generateVideo.ts";
 
 export default createEvent({
   data: { name: "messageCreate" },
-  async run(message, client) {
+  async run(message) {
     const audio = message.attachments;
     console.log(audio);
     let filteredFiles;
