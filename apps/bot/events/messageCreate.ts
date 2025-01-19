@@ -22,8 +22,9 @@ export default createEvent({
       );
       const conversionTime = res.headers.get("Conversion-Time");
       return message.reply({
-        content: `\`${file.filename} \`\n-# Completed in ${Number(conversionTime) / 1000
-          } seconds`,
+        content: `\`${file.filename} \`\n-# Completed in ${
+          Number(conversionTime) / 1000
+        } seconds`,
         files: [attachment],
       });
     }

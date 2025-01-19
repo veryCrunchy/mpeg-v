@@ -18,8 +18,8 @@ export function filterAudioFiles<T extends { filename: string }>(
   if (filteredFiles.length === 0) {
     throw new Error(
       "Unsupported file type, must be one of the following types:\n`" +
-      ALLOWED_EXTENSIONS.join(", ") +
-      "`",
+        ALLOWED_EXTENSIONS.join(", ") +
+        "`",
     );
   }
 
@@ -54,7 +54,7 @@ export async function generateVideo(
   if (ctx instanceof Message) {
     date_created = ctx.createdAt;
   } else {
-    date_created = ctx.interaction.createdAt
+    date_created = ctx.interaction.createdAt;
   }
 
   const data: GenerateVideoRequest = {
@@ -82,9 +82,11 @@ export async function generateVideo(
     throw new Error(
       "File size is too large",
       {
-        cause: `File size exceeds ${guild ? "this guilds" : "discords"
-          } upload limit of \`${determineSizeLimit(guild?.premiumTier || 0) / 1024 / 1024
-          }MB\``,
+        cause: `File size exceeds ${
+          guild ? "this guilds" : "discords"
+        } upload limit of \`${
+          determineSizeLimit(guild?.premiumTier || 0) / 1024 / 1024
+        }MB\``,
       }, //TODO: Promote Pro Plan
     );
   }

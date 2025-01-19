@@ -28,8 +28,9 @@ export class GenerateVideoBase extends ContextMenuCommand {
       const conversionTime = res.headers.get("Conversion-Time");
       console.log(ctx.interaction);
       return ctx.editOrReply({
-        content: `\`${file.filename}\` ${ctx.target.url}\n-# Completed in ${Number(conversionTime) / 1000
-          } seconds`,
+        content: `\`${file.filename}\` ${ctx.target.url}\n-# Completed in ${
+          Number(conversionTime) / 1000
+        } seconds`,
         files: [attachment],
       });
     }
