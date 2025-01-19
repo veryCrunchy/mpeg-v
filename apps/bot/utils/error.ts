@@ -13,7 +13,7 @@ export const handleError = async (
   if (error instanceof Error) {
     err = error
   } else {
-    err = new Error(String(error), { cause: error })
+    err = new Error("Something went wrong", { cause: error })
   }
 
   const m = await ctx.editOrReply({
