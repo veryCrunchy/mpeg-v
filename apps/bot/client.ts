@@ -38,6 +38,5 @@ declare module "seyfert" {
 
   interface InternalOptions {
     asyncCache: true // because you are using WorkerAdapter
-    withPrefix: true // because you have "prefix" callback
   }
 }
