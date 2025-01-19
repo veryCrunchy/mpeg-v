@@ -53,8 +53,6 @@ export async function generateVideo(
   let date_created;
   if (ctx instanceof Message) {
     date_created = ctx.createdAt;
-  } else if (ctx instanceof CommandContext) {
-    date_created = ctx.interaction?.createdAt || ctx.message!.createdAt;
   } else {
     date_created = ctx.interaction.createdAt
   }
