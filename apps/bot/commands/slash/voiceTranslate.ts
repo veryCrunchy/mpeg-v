@@ -6,7 +6,7 @@ import {
   IgnoreCommand,
   Options,
 } from "seyfert";
-import { MessageFlags } from "seyfert/lib/types";
+import { MessageFlags } from "seyfert/lib/types/index.js";
 import {
   isVoiceTranslationRunning,
   startVoiceTranslation,

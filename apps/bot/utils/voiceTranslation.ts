@@ -10,13 +10,13 @@ import {
   VoiceConnectionStatus,
 } from "@discordjs/voice";
 import { Buffer } from "node:buffer";
-import { GatewayDispatchEvents } from "seyfert/lib/types";
+import { GatewayDispatchEvents } from "seyfert/lib/types/index.js";
 import type {
   GatewayDispatchPayload,
   GatewaySendPayload,
   GatewayVoiceServerUpdateDispatchData,
   GatewayVoiceStateUpdateDispatchData,
-} from "seyfert/lib/types";
+} from "seyfert/lib/types/index.js";
 import type { UsingClient } from "seyfert";
 import prism from "prism-media";
 
