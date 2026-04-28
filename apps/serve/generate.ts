@@ -2,7 +2,7 @@
 import ffmpeg from "npm:fluent-ffmpeg";
 import { Readable, Writable } from "node:stream";
 import { Buffer } from "node:buffer";
-import { NodeReadableStream } from "node:stream/web";
+import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import { createItem, determineSizeLimit } from "@mpeg-v/utils";
 import { GenerateVideoRequest, ServeItem } from "@mpeg-v/types";
 const env = Deno.env.get("ENV");
@@ -19,7 +19,7 @@ export default async (req: Request): Promise<Response> => {
   const input_size = Number(file.headers.get("content-length"));
   const max_size = determineSizeLimit(json.tier_limit);
   const nodeReadableStream = Readable.fromWeb(
-    file.body as NodeReadableStream,
+    file.body as unknown as NodeReadableStream<Uint8Array>,
   );
   const chunks: Uint8Array[] = [];
   const output = new Writable({

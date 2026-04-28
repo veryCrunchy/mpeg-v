@@ -1,6 +1,6 @@
 FROM jrottenberg/ffmpeg:4.4-scratch AS ffmpeg
 
-FROM denoland/deno:2.1.4
+FROM denoland/deno:2.7.7
 
 COPY --from=ffmpeg /bin/ffmpeg /bin/ffprobe /usr/local/bin/
 COPY --from=ffmpeg /lib /lib

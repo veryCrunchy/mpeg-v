@@ -1,5 +1,5 @@
 # Build stage
-FROM denoland/deno:alpine-2.1.4 AS build
+FROM denoland/deno:alpine-2.7.7 AS build
 
 WORKDIR /app
 
@@ -11,7 +11,7 @@ RUN deno task postinstall
 RUN deno task build
 
 # Runtime stage
-FROM denoland/deno:alpine-2.1.4
+FROM denoland/deno:alpine-2.7.7
 
 WORKDIR /app
 

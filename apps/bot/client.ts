@@ -1,7 +1,11 @@
 import { ParseClient, WorkerAdapter, WorkerClient } from "seyfert";
 import { handleError } from "utils/error.ts";
+import { handleVoiceGatewayPayload } from "utils/voiceTranslation.ts";
 
 const client = new WorkerClient({
+  handlePayload(_shardId, packet) {
+    handleVoiceGatewayPayload(packet);
+  },
   commands: {
     prefix: () => {
       return ["mv", ".v"];
