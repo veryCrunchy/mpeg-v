@@ -18,4 +18,4 @@ COPY apps/serve ./apps/serve
 
 EXPOSE 3000
 
-CMD ["run","--allow-net","--allow-run","--allow-sys","--allow-read","--allow-env","apps/serve/main.ts"]
+CMD ["run","--allow-net","--allow-run","--allow-sys","--allow-read","--allow-write","--allow-env","apps/serve/main.ts"]
