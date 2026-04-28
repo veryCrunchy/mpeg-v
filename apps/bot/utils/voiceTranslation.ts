@@ -19,6 +19,7 @@ import type {
 } from "seyfert/lib/types/index.js";
 import type { UsingClient } from "seyfert";
 import prism from "prism-media";
+import { updateTranslationSession } from "utils/translationSessions.ts";
 
 type TranslationPayload = {
   text?: string;
@@ -30,6 +31,10 @@ type VoiceAdapterState = {
   guildId: string;
   methods: DiscordGatewayAdapterLibraryMethods;
   destroyed: boolean;
+  gotServerUpdate: boolean;
+  gotOwnStateUpdate: boolean;
+  botUserId?: string;
+  logger: UsingClient["logger"];
 };
 
 type SpeakerState = {
@@ -52,6 +57,7 @@ type Session = {
   targetLanguages: string[];
   roomId: string;
   publishToDiscord: boolean;
+  heartbeatTimer?: number;
 };
 
 const adapters = new Map<string, VoiceAdapterState>();
@@ -64,7 +70,15 @@ export function createSeyfertVoiceAdapter(
   guildId: string,
 ): DiscordGatewayAdapterCreator {
   return (methods) => {
-    adapters.set(guildId, { guildId, methods, destroyed: false });
+    adapters.set(guildId, {
+      guildId,
+      methods,
+      destroyed: false,
+      gotServerUpdate: false,
+      gotOwnStateUpdate: false,
+      botUserId: client.me?.id,
+      logger: client.logger,
+    });
     client.logger.info(`[voice-translate] adapter created guild=${guildId}`);
 
     return {
@@ -93,8 +107,11 @@ export function createSeyfertVoiceAdapter(
 export function handleVoiceServerUpdate(
   data: GatewayVoiceServerUpdateDispatchData,
 ) {
-  console.log(`[voice-translate] VOICE_SERVER_UPDATE guild=${data.guild_id} endpoint=${data.endpoint}`);
-  adapters.get(data.guild_id)?.methods.onVoiceServerUpdate(data);
+  const adapter = adapters.get(data.guild_id);
+  if (!adapter) return;
+  adapter.gotServerUpdate = true;
+  adapter.logger.info(`[voice-translate] VOICE_SERVER_UPDATE guild=${data.guild_id} endpoint=${data.endpoint}`);
+  adapter.methods.onVoiceServerUpdate(data);
 }
 
 export function handleVoiceStateUpdate(
@@ -103,7 +120,11 @@ export function handleVoiceStateUpdate(
   if (!data.guild_id) return;
   const adapter = adapters.get(data.guild_id);
   if (!adapter) return;
-  console.log(`[voice-translate] VOICE_STATE_UPDATE guild=${data.guild_id} user=${data.user_id} channel=${data.channel_id ?? "none"}`);
+  const isBotState = !adapter.botUserId || data.user_id === adapter.botUserId;
+  if (isBotState) {
+    adapter.gotOwnStateUpdate = true;
+    adapter.logger.info(`[voice-translate] BOT VOICE_STATE_UPDATE guild=${data.guild_id} user=${data.user_id} channel=${data.channel_id ?? "none"} session=${data.session_id ? "yes" : "no"}`);
+  }
   adapter.methods.onVoiceStateUpdate(data);
 }
 
@@ -125,6 +146,7 @@ export async function startVoiceTranslation(options: {
   sourceLanguage?: string;
   targetLanguages: string[];
   roomId: string;
+  sessionId: string;
   publishToDiscord?: boolean;
 }) {
   await stopVoiceTranslation(options.guildId);
@@ -138,6 +160,7 @@ export async function startVoiceTranslation(options: {
     selfDeaf: false,
     selfMute: true,
     daveEncryption: false,
+    debug: true,
     adapterCreator: createSeyfertVoiceAdapter(options.client, options.guildId),
   });
 
@@ -153,10 +176,23 @@ export async function startVoiceTranslation(options: {
     publishToDiscord: options.publishToDiscord ?? false,
   };
   sessions.set(options.guildId, session);
+  void updateTranslationSession(options.sessionId, {
+    status: "connected",
+    status_message: "Bot joined the Discord voice channel; waiting for voice receiver readiness.",
+  });
+  session.heartbeatTimer = setInterval(() => {
+    void updateTranslationSession(options.sessionId, {
+      status: connection.state.status === VoiceConnectionStatus.Ready ? "ready" : "connected",
+      status_message: `Voice connection state: ${connection.state.status}`,
+    });
+  }, 15_000) as unknown as number;
 
   connection.on("stateChange", (oldState, newState) => {
     options.client.logger.info(
       `[voice-translate] connection state guild=${options.guildId} ${oldState.status} -> ${newState.status}`,
+    );
+    options.client.logger.debug(
+      `[voice-translate] state detail guild=${options.guildId} ${safeStringifyVoiceState(newState)}`,
     );
   });
 
@@ -172,12 +208,22 @@ export async function startVoiceTranslation(options: {
   void entersState(connection, VoiceConnectionStatus.Ready, 30_000)
     .then(() => {
       options.client.logger.info(`[voice-translate] ready guild=${options.guildId} room=${options.roomId}`);
+      void updateTranslationSession(options.sessionId, {
+        status: "ready",
+        status_message: "Discord voice receiver is ready.",
+      });
     })
     .catch((error) => {
+      const adapter = adapters.get(options.guildId);
       options.client.logger.error(error);
       options.client.logger.warn(
-        `[voice-translate] voice connection did not become ready guild=${options.guildId}. If the bot joined VC but captions do not arrive, check outbound UDP/network access from the bot host.`,
+        `[voice-translate] voice connection did not become ready guild=${options.guildId} gotServer=${adapter?.gotServerUpdate ?? false} gotOwnState=${adapter?.gotOwnStateUpdate ?? false}. If gotServer/gotOwnState are true, check outbound UDP/network access from the bot host.`,
       );
+      void updateTranslationSession(options.sessionId, {
+        status: "degraded",
+        status_message:
+          `Discord voice receiver did not become ready. gotServer=${adapter?.gotServerUpdate ?? false}, gotOwnState=${adapter?.gotOwnStateUpdate ?? false}.`,
+      });
     });
 
   connection.receiver.speaking.on("start", (userId) => {
@@ -198,6 +244,11 @@ export async function stopVoiceTranslation(guildId: string) {
 
   sessions.delete(guildId);
   console.log(`[voice-translate] stopping guild=${guildId}`);
+  if (session.heartbeatTimer) clearInterval(session.heartbeatTimer);
+  void updateTranslationSession(session.roomId, {
+    status: "stopped",
+    status_message: "Voice translation stopped.",
+  });
   for (const speaker of session.speakers.values()) {
     closeSpeaker(speaker);
   }
@@ -390,5 +441,18 @@ function safeJson<T>(value: unknown): T | undefined {
     return JSON.parse(value) as T;
   } catch {
     return undefined;
+  }
+}
+
+function safeStringifyVoiceState(value: unknown) {
+  try {
+    return JSON.stringify(value, (_key, nested) => {
+      if (typeof nested === "function") return undefined;
+      if (nested instanceof Map) return Object.fromEntries(nested.entries());
+      if (nested instanceof Set) return [...nested.values()];
+      return nested;
+    });
+  } catch {
+    return String(value);
   }
 }

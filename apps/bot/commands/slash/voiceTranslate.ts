@@ -13,6 +13,7 @@ import {
   startVoiceTranslation,
   stopVoiceTranslation,
 } from "utils/voiceTranslation.ts";
+import { createTranslationSession } from "utils/translationSessions.ts";
 
 const options = {
   action: createStringOption({
@@ -89,6 +90,18 @@ export default class VoiceTranslateCommand extends Command {
     try {
       const sessionId = createSessionId(ctx.guildId, voice.channelId);
       const liveUrl = `${translatePublicUrl()}/discord/${encodeURIComponent(sessionId)}`;
+      await createTranslationSession({
+        id: sessionId,
+        guild_id: ctx.guildId,
+        voice_channel_id: voice.channelId,
+        text_channel_id: ctx.channelId,
+        room_id: sessionId,
+        live_url: liveUrl,
+        source_language: ctx.options.source ?? "auto",
+        target_languages: targets,
+        status: "starting",
+        status_message: "Bot is joining the Discord voice channel.",
+      });
       await startVoiceTranslation({
         client: ctx.client,
         guildId: ctx.guildId,
@@ -97,6 +110,7 @@ export default class VoiceTranslateCommand extends Command {
         sourceLanguage: ctx.options.source ?? "auto",
         targetLanguages: targets,
         roomId: sessionId,
+        sessionId,
         publishToDiscord: Boolean(ctx.options.post_to_discord),
       });
 
