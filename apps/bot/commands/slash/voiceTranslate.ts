@@ -121,7 +121,7 @@ function createSessionId(guildId: string, channelId: string) {
 }
 
 function translatePublicUrl() {
-  return (Deno.env.get("TRANSLATE_PUBLIC_URL") ?? "https://translate.obiente.cloud")
+  return (Deno.env.get("TRANSLATE_PUBLIC_URL") ?? "https://translate.obiente.org")
     .replace(/\/+$/, "");
 }
 
