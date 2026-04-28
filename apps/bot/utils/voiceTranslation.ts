@@ -65,19 +65,25 @@ export function createSeyfertVoiceAdapter(
 ): DiscordGatewayAdapterCreator {
   return (methods) => {
     adapters.set(guildId, { guildId, methods, destroyed: false });
+    client.logger.info(`[voice-translate] adapter created guild=${guildId}`);
 
     return {
       destroy() {
         const adapter = adapters.get(guildId);
         if (adapter) adapter.destroyed = true;
         adapters.delete(guildId);
+        client.logger.info(`[voice-translate] adapter destroyed guild=${guildId}`);
       },
       sendPayload(payload: GatewaySendPayload) {
         const shardId = client.calculateShardId(guildId);
         const shard = client.shards.get(shardId);
-        if (!shard) return false;
+        if (!shard) {
+          client.logger.warn(`[voice-translate] missing shard guild=${guildId} shard=${shardId}`);
+          return false;
+        }
 
         void shard.send(false, payload);
+        client.logger.info(`[voice-translate] gateway payload sent guild=${guildId} shard=${shardId} op=${payload.op}`);
         return true;
       },
     };
@@ -87,6 +93,7 @@ export function createSeyfertVoiceAdapter(
 export function handleVoiceServerUpdate(
   data: GatewayVoiceServerUpdateDispatchData,
 ) {
+  console.log(`[voice-translate] VOICE_SERVER_UPDATE guild=${data.guild_id} endpoint=${data.endpoint}`);
   adapters.get(data.guild_id)?.methods.onVoiceServerUpdate(data);
 }
 
@@ -96,6 +103,7 @@ export function handleVoiceStateUpdate(
   if (!data.guild_id) return;
   const adapter = adapters.get(data.guild_id);
   if (!adapter) return;
+  console.log(`[voice-translate] VOICE_STATE_UPDATE guild=${data.guild_id} user=${data.user_id} channel=${data.channel_id ?? "none"}`);
   adapter.methods.onVoiceStateUpdate(data);
 }
 
@@ -120,6 +128,9 @@ export async function startVoiceTranslation(options: {
   publishToDiscord?: boolean;
 }) {
   await stopVoiceTranslation(options.guildId);
+  options.client.logger.info(
+    `[voice-translate] starting guild=${options.guildId} voice=${options.voiceChannelId} room=${options.roomId} targets=${options.targetLanguages.join(",")}`,
+  );
 
   const connection = joinVoiceChannel({
     guildId: options.guildId,
@@ -129,8 +140,6 @@ export async function startVoiceTranslation(options: {
     daveEncryption: false,
     adapterCreator: createSeyfertVoiceAdapter(options.client, options.guildId),
   });
-
-  await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
 
   const session: Session = {
     guildId: options.guildId,
@@ -145,11 +154,38 @@ export async function startVoiceTranslation(options: {
   };
   sessions.set(options.guildId, session);
 
+  connection.on("stateChange", (oldState, newState) => {
+    options.client.logger.info(
+      `[voice-translate] connection state guild=${options.guildId} ${oldState.status} -> ${newState.status}`,
+    );
+  });
+
+  connection.on("error", (error) => {
+    options.client.logger.error(error);
+  });
+
+  (connection as unknown as { on(event: "debug", listener: (message: string) => void): void })
+    .on("debug", (message) => {
+      options.client.logger.debug(`[voice-translate] ${message}`);
+    });
+
+  void entersState(connection, VoiceConnectionStatus.Ready, 30_000)
+    .then(() => {
+      options.client.logger.info(`[voice-translate] ready guild=${options.guildId} room=${options.roomId}`);
+    })
+    .catch((error) => {
+      options.client.logger.error(error);
+      options.client.logger.warn(
+        `[voice-translate] voice connection did not become ready guild=${options.guildId}. If the bot joined VC but captions do not arrive, check outbound UDP/network access from the bot host.`,
+      );
+    });
+
   connection.receiver.speaking.on("start", (userId) => {
     void subscribeSpeaker(options.client, session, userId);
   });
 
   connection.on(VoiceConnectionStatus.Disconnected, () => {
+    options.client.logger.warn(`[voice-translate] disconnected guild=${options.guildId}`);
     void stopVoiceTranslation(options.guildId);
   });
 
@@ -161,6 +197,7 @@ export async function stopVoiceTranslation(guildId: string) {
   if (!session) return false;
 
   sessions.delete(guildId);
+  console.log(`[voice-translate] stopping guild=${guildId}`);
   for (const speaker of session.speakers.values()) {
     closeSpeaker(speaker);
   }
@@ -181,6 +218,7 @@ async function subscribeSpeaker(
   if (session.speakers.has(userId)) return;
 
   const websocket = new WebSocket(translationWebSocketUrl());
+  client.logger.info(`[voice-translate] speaker start guild=${session.guildId} user=${userId}`);
   const speaker: SpeakerState = {
     userId,
     websocket,
@@ -191,6 +229,7 @@ async function subscribeSpeaker(
   session.speakers.set(userId, speaker);
 
   websocket.addEventListener("open", () => {
+    client.logger.info(`[voice-translate] whisper socket open user=${userId} room=${session.roomId}`);
     websocket.send(JSON.stringify({
       type: "start",
       channel_id: `${session.guildId}:${userId}`,
@@ -212,10 +251,16 @@ async function subscribeSpeaker(
   websocket.addEventListener("message", (event) => {
     const payload = safeJson<TranslationPayload>(event.data);
     if (!payload?.isFinal) return;
+    client.logger.info(`[voice-translate] final transcript user=${userId}`);
     void publishTranslation(client, session, userId, payload);
   });
 
+  websocket.addEventListener("error", (event) => {
+    client.logger.error(`[voice-translate] whisper socket error user=${userId} ${JSON.stringify(event)}`);
+  });
+
   websocket.addEventListener("close", () => {
+    client.logger.info(`[voice-translate] whisper socket closed user=${userId}`);
     session.speakers.delete(userId);
   });
 
@@ -238,9 +283,15 @@ async function subscribeSpeaker(
   });
 
   decoder.on("close", () => closeSpeaker(speaker));
-  decoder.on("error", () => closeSpeaker(speaker));
+  decoder.on("error", (error) => {
+    client.logger.error(error);
+    closeSpeaker(speaker);
+  });
   opus.on("close", () => closeSpeaker(speaker));
-  opus.on("error", () => closeSpeaker(speaker));
+  opus.on("error", (error) => {
+    client.logger.error(error);
+    closeSpeaker(speaker);
+  });
 
   opus.pipe(decoder);
 }

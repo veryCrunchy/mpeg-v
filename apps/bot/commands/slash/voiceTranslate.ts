@@ -1,6 +1,7 @@
 import {
   Command,
   type CommandContext,
+  createBooleanOption,
   createStringOption,
   Declare,
   IgnoreCommand,
@@ -30,13 +31,9 @@ const options = {
     description: "Source language code, or auto",
     required: false,
   }),
-  mode: createStringOption({
-    description: "Where to show captions",
+  post_to_discord: createBooleanOption({
+    description: "Also post final translations in this Discord channel",
     required: false,
-    choices: [
-      { name: "website", value: "website" },
-      { name: "website-and-discord", value: "both" },
-    ] as const,
   }),
 };
 
@@ -100,7 +97,7 @@ export default class VoiceTranslateCommand extends Command {
         sourceLanguage: ctx.options.source ?? "auto",
         targetLanguages: targets,
         roomId: sessionId,
-        publishToDiscord: ctx.options.mode === "both",
+        publishToDiscord: Boolean(ctx.options.post_to_discord),
       });
 
       return ctx.editOrReply({
@@ -109,6 +106,7 @@ export default class VoiceTranslateCommand extends Command {
     } catch (error) {
       await stopVoiceTranslation(ctx.guildId);
       const detail = error instanceof Error ? error.message : String(error);
+      ctx.client.logger.error(error);
       return ctx.editOrReply({
         content: `Could not start voice translation: ${detail}`,
       });
