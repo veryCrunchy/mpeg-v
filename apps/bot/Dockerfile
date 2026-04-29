@@ -6,4 +6,4 @@ COPY apps/bot ./apps/bot
 
 EXPOSE 3000
 WORKDIR /app/apps/bot
-CMD ["run","--allow-sys","--allow-net","--allow-read","--allow-write","--allow-env","main.ts"]
+CMD ["run","--allow-sys","--allow-net","--allow-read","--allow-write","--allow-env","--allow-ffi","main.ts"]

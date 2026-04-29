@@ -37,6 +37,16 @@ type VoiceAdapterState = {
   logger: UsingClient["logger"];
 };
 
+type ShardRuntime = {
+  send(withPresence: boolean, payload: GatewaySendPayload): void | Promise<void>;
+};
+
+type VoiceRuntimeClient = UsingClient & {
+  me?: { id?: string };
+  calculateShardId(guildId: string): number;
+  shards: Map<number, ShardRuntime>;
+};
+
 type SpeakerState = {
   userId: string;
   websocket: WebSocket;
@@ -69,6 +79,7 @@ export function createSeyfertVoiceAdapter(
   client: UsingClient,
   guildId: string,
 ): DiscordGatewayAdapterCreator {
+  const voiceClient = client as VoiceRuntimeClient;
   return (methods) => {
     adapters.set(guildId, {
       guildId,
@@ -76,7 +87,7 @@ export function createSeyfertVoiceAdapter(
       destroyed: false,
       gotServerUpdate: false,
       gotOwnStateUpdate: false,
-      botUserId: client.me?.id,
+      botUserId: voiceClient.me?.id,
       logger: client.logger,
     });
     client.logger.info(`[voice-translate] adapter created guild=${guildId}`);
@@ -89,8 +100,8 @@ export function createSeyfertVoiceAdapter(
         client.logger.info(`[voice-translate] adapter destroyed guild=${guildId}`);
       },
       sendPayload(payload: GatewaySendPayload) {
-        const shardId = client.calculateShardId(guildId);
-        const shard = client.shards.get(shardId);
+        const shardId = voiceClient.calculateShardId(guildId);
+        const shard = voiceClient.shards.get(shardId);
         if (!shard) {
           client.logger.warn(`[voice-translate] missing shard guild=${guildId} shard=${shardId}`);
           return false;
@@ -159,7 +170,7 @@ export async function startVoiceTranslation(options: {
     channelId: options.voiceChannelId,
     selfDeaf: false,
     selfMute: true,
-    daveEncryption: false,
+    daveEncryption: true,
     debug: true,
     adapterCreator: createSeyfertVoiceAdapter(options.client, options.guildId),
   });
