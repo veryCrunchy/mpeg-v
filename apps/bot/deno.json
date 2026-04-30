@@ -2,6 +2,7 @@
   "tasks": {
     "dev": "deno run --env-file --allow-sys --allow-net --allow-env --allow-read --allow-write --allow-ffi --watch main.ts",
     "start": "deno run --env-file --allow-sys --allow-net --allow-env --allow-read --allow-write --allow-ffi main.ts",
+    "test:voice-native": "deno run --allow-sys --allow-net --allow-env --allow-read --allow-ffi tests/voiceNative.ts",
     "start:docker": "docker run mpeg-v-bot"
   },
   "imports": {
