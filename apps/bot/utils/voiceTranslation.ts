@@ -54,6 +54,12 @@ type SpeakerState = {
   sequence: number;
   pcmQueue: Buffer[];
   flushTimer?: number;
+  keepaliveTimer?: number;
+  audioActive: boolean;
+  opusPackets: number;
+  decodedChunks: number;
+  sentChunks: number;
+  sentBytes: number;
   closed: boolean;
 };
 
@@ -277,7 +283,12 @@ async function subscribeSpeaker(
   session: Session,
   userId: string,
 ) {
-  if (session.speakers.has(userId)) return;
+  const existing = session.speakers.get(userId);
+  if (existing && !existing.closed) {
+    client.logger.info(`[voice-translate] speaker resume guild=${session.guildId} user=${userId}`);
+    subscribeSpeakerAudio(client, session, existing);
+    return;
+  }
 
   const websocket = new WebSocket(translationWebSocketUrl());
   client.logger.info(`[voice-translate] speaker start guild=${session.guildId} user=${userId}`);
@@ -286,6 +297,11 @@ async function subscribeSpeaker(
     websocket,
     sequence: 0,
     pcmQueue: [],
+    audioActive: false,
+    opusPackets: 0,
+    decodedChunks: 0,
+    sentChunks: 0,
+    sentBytes: 0,
     closed: false,
   };
   session.speakers.set(userId, speaker);
@@ -307,13 +323,18 @@ async function subscribeSpeaker(
       peer_id: userId,
       peer_label: `<@${userId}>`,
     }));
+    startSpeakerKeepalive(speaker);
     flushPcm(speaker);
   });
 
   websocket.addEventListener("message", (event) => {
     const payload = safeJson<TranslationPayload>(event.data);
+    const type = payload && "type" in payload ? String((payload as { type?: unknown }).type) : undefined;
+    if (type && type !== "pong") {
+      client.logger.info(`[voice-translate] whisper message user=${userId} type=${type}`);
+    }
     if (!payload?.isFinal) return;
-    client.logger.info(`[voice-translate] final transcript user=${userId}`);
+    client.logger.info(`[voice-translate] final transcript user=${userId} text=${payload.text?.slice(0, 80) ?? ""}`);
     void publishTranslation(client, session, userId, payload);
   });
 
@@ -322,14 +343,29 @@ async function subscribeSpeaker(
   });
 
   websocket.addEventListener("close", () => {
-    client.logger.info(`[voice-translate] whisper socket closed user=${userId}`);
+    client.logger.info(
+      `[voice-translate] whisper socket closed user=${userId} opus=${speaker.opusPackets} decoded=${speaker.decodedChunks} sent=${speaker.sentChunks} bytes=${speaker.sentBytes}`,
+    );
+    if (speaker.keepaliveTimer) clearInterval(speaker.keepaliveTimer);
+    speaker.closed = true;
     session.speakers.delete(userId);
   });
 
-  const opus = session.connection.receiver.subscribe(userId, {
+  subscribeSpeakerAudio(client, session, speaker);
+}
+
+function subscribeSpeakerAudio(
+  client: UsingClient,
+  session: Session,
+  speaker: SpeakerState,
+) {
+  if (speaker.closed || speaker.audioActive) return;
+  speaker.audioActive = true;
+
+  const opus = session.connection.receiver.subscribe(speaker.userId, {
     end: {
       behavior: EndBehaviorType.AfterInactivity,
-      duration: 1_000,
+      duration: 2_000,
     },
   });
 
@@ -340,19 +376,42 @@ async function subscribeSpeaker(
   });
   speaker.decoder = decoder;
 
+  opus.on("data", (chunk: Buffer) => {
+    speaker.opusPackets++;
+    if (speaker.opusPackets === 1 || speaker.opusPackets % 100 === 0) {
+      client.logger.info(
+        `[voice-translate] opus packets user=${speaker.userId} count=${speaker.opusPackets} last_bytes=${chunk.length}`,
+      );
+    }
+  });
+
   decoder.on("data", (chunk: Buffer) => {
+    speaker.decodedChunks++;
+    if (speaker.decodedChunks === 1 || speaker.decodedChunks % 100 === 0) {
+      client.logger.info(
+        `[voice-translate] decoded pcm user=${speaker.userId} chunks=${speaker.decodedChunks} last_bytes=${chunk.length}`,
+      );
+    }
     enqueuePcm(speaker, downmixStereoPcm16(chunk));
   });
 
-  decoder.on("close", () => closeSpeaker(speaker));
+  decoder.on("close", () => {
+    speaker.audioActive = false;
+    speaker.decoder = undefined;
+    client.logger.info(`[voice-translate] decoder closed user=${speaker.userId}`);
+  });
   decoder.on("error", (error) => {
     client.logger.error(error);
-    closeSpeaker(speaker);
+    speaker.audioActive = false;
+    speaker.decoder = undefined;
   });
-  opus.on("close", () => closeSpeaker(speaker));
+  opus.on("close", () => {
+    speaker.audioActive = false;
+    client.logger.info(`[voice-translate] opus stream closed user=${speaker.userId}`);
+  });
   opus.on("error", (error) => {
     client.logger.error(error);
-    closeSpeaker(speaker);
+    speaker.audioActive = false;
   });
 
   opus.pipe(decoder);
@@ -379,6 +438,8 @@ function flushPcm(speaker: SpeakerState) {
 
   const pcm = Buffer.concat(speaker.pcmQueue);
   speaker.pcmQueue = [];
+  speaker.sentChunks++;
+  speaker.sentBytes += pcm.length;
   speaker.websocket.send(JSON.stringify({
     type: "chunk",
     sequence: speaker.sequence++,
@@ -386,17 +447,31 @@ function flushPcm(speaker: SpeakerState) {
     sample_rate: 48_000,
     data: pcm.toString("base64"),
   }));
+  if (speaker.sentChunks === 1 || speaker.sentChunks % 20 === 0) {
+    console.log(
+      `[voice-translate] sent pcm user=${speaker.userId} chunks=${speaker.sentChunks} bytes=${speaker.sentBytes} last_bytes=${pcm.length}`,
+    );
+  }
 }
 
 function closeSpeaker(speaker: SpeakerState) {
   if (speaker.closed) return;
   speaker.closed = true;
   if (speaker.flushTimer) clearTimeout(speaker.flushTimer);
+  if (speaker.keepaliveTimer) clearInterval(speaker.keepaliveTimer);
   speaker.decoder?.destroy();
   if (speaker.websocket.readyState === WebSocket.OPEN) {
     speaker.websocket.send(JSON.stringify({ type: "stop" }));
   }
   speaker.websocket.close();
+}
+
+function startSpeakerKeepalive(speaker: SpeakerState) {
+  if (speaker.keepaliveTimer) clearInterval(speaker.keepaliveTimer);
+  speaker.keepaliveTimer = setInterval(() => {
+    if (speaker.closed || speaker.websocket.readyState !== WebSocket.OPEN) return;
+    speaker.websocket.send(JSON.stringify({ type: "ping", ts: Date.now() }));
+  }, 15_000) as unknown as number;
 }
 
 async function publishTranslation(
