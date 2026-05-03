@@ -496,7 +496,7 @@ function subscribeSpeakerAudio(
         `[voice-translate] decoded pcm user=${speaker.userId} chunks=${speaker.decodedChunks} last_bytes=${chunk.length}`,
       );
     }
-    enqueuePcm(speaker, downmixStereoPcm16(chunk));
+    enqueuePcm(speaker, downmixAndResampleStereoPcm16ToMono16k(chunk));
   });
 
   decoder.on("close", () => {
@@ -575,7 +575,7 @@ function flushPcm(speaker: SpeakerState) {
     type: "chunk",
     sequence: speaker.sequence++,
     mime_type: "audio/pcm",
-    sample_rate: 48_000,
+    sample_rate: 16_000,
     data: pcm.toString("base64"),
   }));
   if (speaker.sentChunks === 1 || speaker.sentChunks % 20 === 0) {
@@ -656,15 +656,26 @@ function isBlankAudioText(text: string): boolean {
   return normalized === "[BLANK_AUDIO]" || normalized === "BLANK_AUDIO";
 }
 
-function downmixStereoPcm16(input: Buffer) {
-  const frameCount = Math.floor(input.length / 4);
-  const output = Buffer.allocUnsafe(frameCount * 2);
+function downmixAndResampleStereoPcm16ToMono16k(input: Buffer) {
+  const frameCount = Math.floor(input.length / 4); // 48k stereo frames
+  if (frameCount <= 0) return Buffer.alloc(0);
 
+  const mono48 = new Int16Array(frameCount);
   for (let frame = 0; frame < frameCount; frame++) {
     const offset = frame * 4;
     const left = input.readInt16LE(offset);
     const right = input.readInt16LE(offset + 2);
-    output.writeInt16LE((left + right) >> 1, frame * 2);
+    mono48[frame] = (left + right) >> 1;
+  }
+
+  // Discord opus decode gives us 48kHz PCM. Average every 3 mono samples
+  // to produce 16kHz mono PCM16 for the Whisper websocket.
+  const outFrames = Math.floor(frameCount / 3);
+  const output = Buffer.allocUnsafe(outFrames * 2);
+  for (let i = 0; i < outFrames; i++) {
+    const base = i * 3;
+    const mixed = Math.round((mono48[base] + mono48[base + 1] + mono48[base + 2]) / 3);
+    output.writeInt16LE(mixed, i * 2);
   }
 
   return output;
