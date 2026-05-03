@@ -491,12 +491,14 @@ function subscribeSpeakerAudio(
 
   decoder.on("data", (chunk: Buffer) => {
     speaker.decodedChunks++;
+    const mono16k = downmixAndResampleStereoPcm16ToMono16k(chunk);
     if (speaker.decodedChunks === 1 || speaker.decodedChunks % 100 === 0) {
+      const { rms, peak } = pcm16Stats(mono16k);
       client.logger.info(
-        `[voice-translate] decoded pcm user=${speaker.userId} chunks=${speaker.decodedChunks} last_bytes=${chunk.length}`,
+        `[voice-translate] decoded pcm user=${speaker.userId} chunks=${speaker.decodedChunks} last_bytes=${chunk.length} mono16k_bytes=${mono16k.length} rms=${rms.toFixed(4)} peak=${peak.toFixed(4)}`,
       );
     }
-    enqueuePcm(speaker, downmixAndResampleStereoPcm16ToMono16k(chunk));
+    enqueuePcm(speaker, mono16k);
   });
 
   decoder.on("close", () => {
@@ -579,8 +581,9 @@ function flushPcm(speaker: SpeakerState) {
     data: pcm.toString("base64"),
   }));
   if (speaker.sentChunks === 1 || speaker.sentChunks % 20 === 0) {
+    const { rms, peak } = pcm16Stats(pcm);
     speaker.logger.info(
-      `[voice-translate] sent pcm user=${speaker.userId} chunks=${speaker.sentChunks} bytes=${speaker.sentBytes} last_bytes=${pcm.length}`,
+      `[voice-translate] sent pcm user=${speaker.userId} chunks=${speaker.sentChunks} bytes=${speaker.sentBytes} last_bytes=${pcm.length} rms=${rms.toFixed(4)} peak=${peak.toFixed(4)}`,
     );
   }
 }
@@ -679,6 +682,23 @@ function downmixAndResampleStereoPcm16ToMono16k(input: Buffer) {
   }
 
   return output;
+}
+
+function pcm16Stats(input: Buffer) {
+  if (input.length < 2) return { rms: 0, peak: 0 };
+  let sumSquares = 0;
+  let peak = 0;
+  const samples = Math.floor(input.length / 2);
+  for (let i = 0; i < samples; i++) {
+    const value = input.readInt16LE(i * 2) / 32768;
+    const abs = Math.abs(value);
+    sumSquares += value * value;
+    if (abs > peak) peak = abs;
+  }
+  return {
+    rms: Math.sqrt(sumSquares / samples),
+    peak,
+  };
 }
 
 function translationWebSocketUrl() {
