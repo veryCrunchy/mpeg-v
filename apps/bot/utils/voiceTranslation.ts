@@ -63,6 +63,7 @@ type SpeakerState = {
   sentBytes: number;
   queuedBytes: number;
   closed: boolean;
+  lastFinalizeAt?: number;
 };
 
 type SpeakerProfile = {
@@ -507,6 +508,8 @@ function subscribeSpeakerAudio(
   opus.on("close", () => {
     speaker.audioActive = false;
     client.logger.info(`[voice-translate] opus stream closed user=${speaker.userId}`);
+    flushPcm(speaker);
+    requestSpeakerFinalize(speaker);
   });
   opus.on("error", (error) => {
     client.logger.error(error);
@@ -588,6 +591,15 @@ function closeSpeaker(speaker: SpeakerState) {
     speaker.websocket.send(JSON.stringify({ type: "stop" }));
   }
   speaker.websocket.close();
+}
+
+function requestSpeakerFinalize(speaker: SpeakerState) {
+  if (speaker.closed) return;
+  if (speaker.websocket.readyState !== WebSocket.OPEN) return;
+  const now = Date.now();
+  if (speaker.lastFinalizeAt && now - speaker.lastFinalizeAt < 1000) return;
+  speaker.lastFinalizeAt = now;
+  speaker.websocket.send(JSON.stringify({ type: "finalize", ts: now }));
 }
 
 function startSpeakerKeepalive(speaker: SpeakerState) {
