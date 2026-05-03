@@ -23,7 +23,11 @@ import { updateTranslationSession } from "utils/translationSessions.ts";
 
 type TranslationPayload = {
   text?: string;
-  translations?: Record<string, string>;
+  translations?: Record<string, string | {
+    primary?: string;
+    detectedLanguage?: string;
+    alternatives?: string[];
+  }>;
   isFinal?: boolean;
 };
 
@@ -618,6 +622,7 @@ async function publishTranslation(
 ) {
   const text = firstTranslation(payload) ?? payload.text?.trim();
   if (!text) return;
+  if (isBlankAudioText(text)) return;
   if (!session.publishToDiscord) return;
 
   await client.messages.write(session.textChannelId, {
@@ -628,10 +633,27 @@ async function publishTranslation(
 function firstTranslation(payload: TranslationPayload) {
   const translations = payload.translations ?? {};
   for (const lang of Object.keys(translations).sort()) {
-    const text = translations[lang]?.trim();
-    if (text) return text;
+    const value = translations[lang];
+    if (typeof value === "string") {
+      const text = value.trim();
+      if (text && !isBlankAudioText(text)) return text;
+      continue;
+    }
+    if (value && typeof value === "object") {
+      const primary = typeof value.primary === "string" ? value.primary.trim() : "";
+      if (primary && !isBlankAudioText(primary)) return primary;
+      const alternative = Array.isArray(value.alternatives)
+        ? value.alternatives.find((item) => typeof item === "string" && item.trim() && !isBlankAudioText(item))
+        : undefined;
+      if (alternative) return alternative.trim();
+    }
   }
   return undefined;
+}
+
+function isBlankAudioText(text: string): boolean {
+  const normalized = text.trim().toUpperCase();
+  return normalized === "[BLANK_AUDIO]" || normalized === "BLANK_AUDIO";
 }
 
 function downmixStereoPcm16(input: Buffer) {
