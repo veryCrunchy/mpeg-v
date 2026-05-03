@@ -524,7 +524,7 @@ function enqueuePcm(speaker: SpeakerState, chunk: Buffer) {
   speaker.queuedBytes += chunk.length;
   if (speaker.websocket.readyState !== WebSocket.OPEN) {
     if (speaker.pcmQueue.length === 1 || speaker.pcmQueue.length % 25 === 0) {
-      speaker.logger.info(
+      speaker.logger.debug(
         `[voice-translate] queue waiting user=${speaker.userId} readyState=${speaker.websocket.readyState} chunks=${speaker.pcmQueue.length} bytes=${speaker.queuedBytes}`,
       );
     }
@@ -540,9 +540,11 @@ function enqueuePcm(speaker: SpeakerState, chunk: Buffer) {
 
   speaker.flushTimer = setTimeout(() => {
     speaker.flushTimer = undefined;
-    speaker.logger.info(
-      `[voice-translate] flush timer fired user=${speaker.userId} queued_chunks=${speaker.pcmQueue.length} queued_bytes=${speaker.queuedBytes}`,
-    );
+    if (speaker.pcmQueue.length > 0) {
+      speaker.logger.debug(
+        `[voice-translate] flush timer fired user=${speaker.userId} queued_chunks=${speaker.pcmQueue.length} queued_bytes=${speaker.queuedBytes}`,
+      );
+    }
     flushPcm(speaker);
   }, 100);
 }
@@ -550,7 +552,7 @@ function enqueuePcm(speaker: SpeakerState, chunk: Buffer) {
 function flushPcm(speaker: SpeakerState) {
   if (speaker.closed) return;
   if (speaker.websocket.readyState !== WebSocket.OPEN) {
-    speaker.logger.info(
+    speaker.logger.debug(
       `[voice-translate] flush skipped user=${speaker.userId} readyState=${speaker.websocket.readyState} queued_chunks=${speaker.pcmQueue.length} queued_bytes=${speaker.queuedBytes}`,
     );
     return;
