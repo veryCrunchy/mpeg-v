@@ -477,9 +477,9 @@ function subscribeSpeakerAudio(
   });
 
   const decoder = new prism.opus.Decoder({
-    rate: 48_000,
-    channels: 2,
-    frameSize: 960,
+    rate: 16_000,
+    channels: 1,
+    frameSize: 320,
   });
   speaker.decoder = decoder;
 
@@ -494,11 +494,11 @@ function subscribeSpeakerAudio(
 
   decoder.on("data", (chunk: Buffer) => {
     speaker.decodedChunks++;
-    const mono16k = normalizePcm16Level(downmixAndResampleStereoPcm16ToMono16k(chunk));
+    const mono16k = chunk;
     if (speaker.decodedChunks === 1 || speaker.decodedChunks % 100 === 0) {
       const { rms, peak } = pcm16Stats(mono16k);
       client.logger.info(
-        `[voice-translate] decoded pcm user=${speaker.userId} chunks=${speaker.decodedChunks} last_bytes=${chunk.length} mono16k_bytes=${mono16k.length} rms=${rms.toFixed(4)} peak=${peak.toFixed(4)}`,
+        `[voice-translate] decoded pcm user=${speaker.userId} chunks=${speaker.decodedChunks} mono16k_bytes=${mono16k.length} rms=${rms.toFixed(4)} peak=${peak.toFixed(4)}`,
       );
     }
     enqueuePcm(speaker, mono16k);
@@ -666,31 +666,6 @@ function isBlankAudioText(text: string): boolean {
   return normalized === "[BLANK_AUDIO]" || normalized === "BLANK_AUDIO";
 }
 
-function downmixAndResampleStereoPcm16ToMono16k(input: Buffer) {
-  const frameCount = Math.floor(input.length / 4); // 48k stereo frames
-  if (frameCount <= 0) return Buffer.alloc(0);
-
-  const mono48 = new Int16Array(frameCount);
-  for (let frame = 0; frame < frameCount; frame++) {
-    const offset = frame * 4;
-    const left = input.readInt16LE(offset);
-    const right = input.readInt16LE(offset + 2);
-    mono48[frame] = (left + right) >> 1;
-  }
-
-  // Discord opus decode gives us 48kHz PCM. Average every 3 mono samples
-  // to produce 16kHz mono PCM16 for the Whisper websocket.
-  const outFrames = Math.floor(frameCount / 3);
-  const output = Buffer.allocUnsafe(outFrames * 2);
-  for (let i = 0; i < outFrames; i++) {
-    const base = i * 3;
-    const mixed = Math.round((mono48[base] + mono48[base + 1] + mono48[base + 2]) / 3);
-    output.writeInt16LE(mixed, i * 2);
-  }
-
-  return output;
-}
-
 function pcm16Stats(input: Buffer) {
   if (input.length < 2) return { rms: 0, peak: 0 };
   let sumSquares = 0;
@@ -706,38 +681,6 @@ function pcm16Stats(input: Buffer) {
     rms: Math.sqrt(sumSquares / samples),
     peak,
   };
-}
-
-function normalizePcm16Level(input: Buffer) {
-  const { rms, peak } = pcm16Stats(input);
-  if (input.length < 2 || rms <= 0.003 || peak <= 0.01) {
-    return input;
-  }
-
-  const targetRms = 0.075;
-  let gain = targetRms / rms;
-  if (!Number.isFinite(gain) || gain <= 1.0) {
-    return input;
-  }
-
-  const maxGainFromPeak = 0.92 / peak;
-  if (Number.isFinite(maxGainFromPeak) && maxGainFromPeak > 0) {
-    gain = Math.min(gain, maxGainFromPeak);
-  }
-  gain = Math.min(gain, 6);
-
-  if (gain <= 1.05) {
-    return input;
-  }
-
-  const output = Buffer.allocUnsafe(input.length);
-  const samples = Math.floor(input.length / 2);
-  for (let i = 0; i < samples; i++) {
-    const scaled = Math.round(input.readInt16LE(i * 2) * gain);
-    const clamped = Math.max(-32768, Math.min(32767, scaled));
-    output.writeInt16LE(clamped, i * 2);
-  }
-  return output;
 }
 
 async function dumpSpeakerAudio(speaker: SpeakerState, tag: string) {
