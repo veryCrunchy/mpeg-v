@@ -65,6 +65,11 @@ type SpeakerState = {
   closed: boolean;
 };
 
+type SpeakerProfile = {
+  label: string;
+  avatarUrl?: string;
+};
+
 type Session = {
   guildId: string;
   channelId: string;
@@ -76,6 +81,7 @@ type Session = {
   roomId: string;
   publishToDiscord: boolean;
   heartbeatTimer?: number;
+  speakerProfiles: Map<string, SpeakerProfile>;
 };
 
 const adapters = new Map<string, VoiceAdapterState>();
@@ -193,6 +199,7 @@ export async function startVoiceTranslation(options: {
     targetLanguages: options.targetLanguages.map(normalizeLanguage).filter(Boolean),
     roomId: options.roomId,
     publishToDiscord: options.publishToDiscord ?? false,
+    speakerProfiles: new Map(),
   };
   sessions.set(options.guildId, session);
   void updateTranslationSession(options.sessionId, {
@@ -285,6 +292,8 @@ async function subscribeSpeaker(
   session: Session,
   userId: string,
 ) {
+  const profile = await resolveSpeakerProfile(client, session.guildId, userId);
+  session.speakerProfiles.set(userId, profile);
   const existing = session.speakers.get(userId);
   if (existing && !existing.closed) {
     client.logger.info(`[voice-translate] speaker resume guild=${session.guildId} user=${userId}`);
@@ -319,13 +328,15 @@ async function subscribeSpeaker(
       target_languages: session.targetLanguages,
       room_id: session.roomId,
       peer_id: userId,
-      peer_label: `<@${userId}>`,
+      peer_label: profile.label,
+      peer_avatar_url: profile.avatarUrl,
     }));
     websocket.send(JSON.stringify({
       type: "join_room",
       room_id: session.roomId,
       peer_id: userId,
-      peer_label: `<@${userId}>`,
+      peer_label: profile.label,
+      peer_avatar_url: profile.avatarUrl,
     }));
     startSpeakerKeepalive(speaker);
     flushPcm(speaker);
@@ -371,6 +382,75 @@ async function subscribeSpeaker(
   });
 
   subscribeSpeakerAudio(client, session, speaker);
+}
+
+async function resolveSpeakerProfile(
+  client: UsingClient,
+  guildId: string,
+  userId: string,
+): Promise<SpeakerProfile> {
+  const fallback: SpeakerProfile = { label: `Discord ${userId.slice(-4)}` };
+  const token = client.rest.options.token;
+  if (!token) return fallback;
+
+  try {
+    const response = await fetch(
+      `https://discord.com/api/v10/guilds/${guildId}/members/${userId}`,
+      {
+        headers: {
+          Authorization: `Bot ${token}`,
+          Accept: "application/json",
+        },
+      },
+    );
+    if (!response.ok) return fallback;
+
+    const member = await response.json() as {
+      nick?: string | null;
+      avatar?: string | null;
+      user?: {
+        id?: string;
+        username?: string;
+        global_name?: string | null;
+        avatar?: string | null;
+        discriminator?: string;
+      };
+    };
+
+    const label =
+      member.nick?.trim() ||
+      member.user?.global_name?.trim() ||
+      member.user?.username?.trim() ||
+      fallback.label;
+
+    const avatarUrl = member.avatar
+      ? guildMemberAvatarUrl(guildId, userId, member.avatar)
+      : member.user?.avatar
+      ? userAvatarUrl(userId, member.user.avatar)
+      : defaultAvatarUrl(member.user?.discriminator, userId);
+
+    return { label, avatarUrl };
+  } catch {
+    return fallback;
+  }
+}
+
+function guildMemberAvatarUrl(guildId: string, userId: string, avatar: string): string {
+  const ext = avatar.startsWith("a_") ? "gif" : "png";
+  return `https://cdn.discordapp.com/guilds/${guildId}/users/${userId}/avatars/${avatar}.${ext}?size=128`;
+}
+
+function userAvatarUrl(userId: string, avatar: string): string {
+  const ext = avatar.startsWith("a_") ? "gif" : "png";
+  return `https://cdn.discordapp.com/avatars/${userId}/${avatar}.${ext}?size=128`;
+}
+
+function defaultAvatarUrl(discriminator: string | undefined, userId: string): string {
+  const legacy = Number(discriminator);
+  const index = Number.isFinite(legacy) && legacy > 0
+    ? legacy % 5
+    : (Number(BigInt(userId) >> 22n) % 6);
+  return `https://cdn.discordapp.com/embed/avatars/${index}.png`;
 }
 
 function subscribeSpeakerAudio(
