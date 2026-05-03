@@ -55,10 +55,12 @@ type SpeakerState = {
   websocket: WebSocket;
   logger: UsingClient["logger"];
   decoder?: prism.opus.Decoder;
+  opus?: NodeJS.ReadableStream;
   sequence: number;
   pcmQueue: Buffer[];
   flushTimer?: number;
   keepaliveTimer?: number;
+  finalizeTimer?: number;
   audioActive: boolean;
   opusPackets: number;
   decodedChunks: number;
@@ -260,6 +262,11 @@ export async function startVoiceTranslation(options: {
 
   connection.receiver.speaking.on("start", (userId) => {
     void subscribeSpeaker(options.client, session, userId);
+  });
+  connection.receiver.speaking.on("end", (userId) => {
+    const speaker = session.speakers.get(userId);
+    if (!speaker || speaker.closed) return;
+    scheduleSpeakerFinalize(speaker, 1_200);
   });
 
   connection.on(VoiceConnectionStatus.Disconnected, () => {
@@ -471,10 +478,10 @@ function subscribeSpeakerAudio(
 
   const opus = session.connection.receiver.subscribe(speaker.userId, {
     end: {
-      behavior: EndBehaviorType.AfterInactivity,
-      duration: 2_000,
+      behavior: EndBehaviorType.Manual,
     },
   });
+  speaker.opus = opus;
 
   const decoder = new prism.opus.Decoder({
     rate: 16_000,
@@ -518,7 +525,6 @@ function subscribeSpeakerAudio(
     speaker.audioActive = false;
     client.logger.info(`[voice-translate] opus stream closed user=${speaker.userId}`);
     flushPcm(speaker);
-    requestSpeakerFinalize(speaker);
   });
   opus.on("error", (error) => {
     client.logger.error(error);
@@ -599,7 +605,11 @@ function closeSpeaker(speaker: SpeakerState) {
   speaker.closed = true;
   if (speaker.flushTimer) clearTimeout(speaker.flushTimer);
   if (speaker.keepaliveTimer) clearInterval(speaker.keepaliveTimer);
+  if (speaker.finalizeTimer) clearTimeout(speaker.finalizeTimer);
   speaker.decoder?.destroy();
+  if (speaker.opus && "destroy" in speaker.opus && typeof speaker.opus.destroy === "function") {
+    speaker.opus.destroy();
+  }
   if (speaker.websocket.readyState === WebSocket.OPEN) {
     speaker.websocket.send(JSON.stringify({ type: "stop" }));
   }
@@ -614,6 +624,16 @@ function requestSpeakerFinalize(speaker: SpeakerState) {
   speaker.lastFinalizeAt = now;
   void dumpSpeakerAudio(speaker, "finalize");
   speaker.websocket.send(JSON.stringify({ type: "finalize", ts: now }));
+}
+
+function scheduleSpeakerFinalize(speaker: SpeakerState, delayMs: number) {
+  if (speaker.closed) return;
+  if (speaker.finalizeTimer) clearTimeout(speaker.finalizeTimer);
+  speaker.finalizeTimer = setTimeout(() => {
+    speaker.finalizeTimer = undefined;
+    flushPcm(speaker);
+    requestSpeakerFinalize(speaker);
+  }, delayMs);
 }
 
 function startSpeakerKeepalive(speaker: SpeakerState) {
