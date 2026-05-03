@@ -1,14 +1,4 @@
 import "opusscript";
-
-import {
-  EndBehaviorType,
-  entersState,
-  joinVoiceChannel,
-  type DiscordGatewayAdapterCreator,
-  type DiscordGatewayAdapterLibraryMethods,
-  type VoiceConnection,
-  VoiceConnectionStatus,
-} from "@discordjs/voice";
 import { Buffer } from "node:buffer";
 import { GatewayDispatchEvents } from "seyfert/lib/types/index.js";
 import type {
@@ -20,6 +10,15 @@ import type {
 import type { UsingClient } from "seyfert";
 import prism from "prism-media";
 import { updateTranslationSession } from "utils/translationSessions.ts";
+import {
+  EndBehaviorType,
+  entersState,
+  joinVoiceChannel,
+  type DiscordGatewayAdapterCreator,
+  type DiscordGatewayAdapterLibraryMethods,
+  type VoiceConnection,
+  VoiceConnectionStatus,
+} from "@discordjs/voice";
 
 type TranslationPayload = {
   text?: string;
@@ -68,6 +67,8 @@ type SpeakerState = {
   queuedBytes: number;
   closed: boolean;
   lastFinalizeAt?: number;
+  debugPcmChunks: Buffer[];
+  dumpCount: number;
 };
 
 type SpeakerProfile = {
@@ -321,6 +322,8 @@ async function subscribeSpeaker(
     sentBytes: 0,
     queuedBytes: 0,
     closed: false,
+    debugPcmChunks: [],
+    dumpCount: 0,
   };
   session.speakers.set(userId, speaker);
 
@@ -491,7 +494,7 @@ function subscribeSpeakerAudio(
 
   decoder.on("data", (chunk: Buffer) => {
     speaker.decodedChunks++;
-    const mono16k = downmixAndResampleStereoPcm16ToMono16k(chunk);
+    const mono16k = normalizePcm16Level(downmixAndResampleStereoPcm16ToMono16k(chunk));
     if (speaker.decodedChunks === 1 || speaker.decodedChunks % 100 === 0) {
       const { rms, peak } = pcm16Stats(mono16k);
       client.logger.info(
@@ -571,6 +574,9 @@ function flushPcm(speaker: SpeakerState) {
   const pcm = Buffer.concat(speaker.pcmQueue);
   speaker.pcmQueue = [];
   speaker.queuedBytes = 0;
+  if (debugDumpDir()) {
+    speaker.debugPcmChunks.push(pcm);
+  }
   speaker.sentChunks++;
   speaker.sentBytes += pcm.length;
   speaker.websocket.send(JSON.stringify({
@@ -606,6 +612,7 @@ function requestSpeakerFinalize(speaker: SpeakerState) {
   const now = Date.now();
   if (speaker.lastFinalizeAt && now - speaker.lastFinalizeAt < 1000) return;
   speaker.lastFinalizeAt = now;
+  void dumpSpeakerAudio(speaker, "finalize");
   speaker.websocket.send(JSON.stringify({ type: "finalize", ts: now }));
 }
 
@@ -699,6 +706,85 @@ function pcm16Stats(input: Buffer) {
     rms: Math.sqrt(sumSquares / samples),
     peak,
   };
+}
+
+function normalizePcm16Level(input: Buffer) {
+  const { rms, peak } = pcm16Stats(input);
+  if (input.length < 2 || rms <= 0.003 || peak <= 0.01) {
+    return input;
+  }
+
+  const targetRms = 0.075;
+  let gain = targetRms / rms;
+  if (!Number.isFinite(gain) || gain <= 1.0) {
+    return input;
+  }
+
+  const maxGainFromPeak = 0.92 / peak;
+  if (Number.isFinite(maxGainFromPeak) && maxGainFromPeak > 0) {
+    gain = Math.min(gain, maxGainFromPeak);
+  }
+  gain = Math.min(gain, 6);
+
+  if (gain <= 1.05) {
+    return input;
+  }
+
+  const output = Buffer.allocUnsafe(input.length);
+  const samples = Math.floor(input.length / 2);
+  for (let i = 0; i < samples; i++) {
+    const scaled = Math.round(input.readInt16LE(i * 2) * gain);
+    const clamped = Math.max(-32768, Math.min(32767, scaled));
+    output.writeInt16LE(clamped, i * 2);
+  }
+  return output;
+}
+
+async function dumpSpeakerAudio(speaker: SpeakerState, tag: string) {
+  const dir = debugDumpDir();
+  if (!dir || !speaker.debugPcmChunks.length) return;
+  const pcm = Buffer.concat(speaker.debugPcmChunks);
+  speaker.debugPcmChunks = [];
+  if (!pcm.length) return;
+  try {
+    await Deno.mkdir(dir, { recursive: true });
+    speaker.dumpCount += 1;
+    const name = `${safeFileComponent(speaker.userId)}_${safeFileComponent(tag)}_${String(speaker.dumpCount).padStart(2, "0")}_${Date.now()}.wav`;
+    const path = `${dir}/${name}`;
+    await Deno.writeFile(path, pcm16MonoToWav(pcm, 16_000));
+    const { rms, peak } = pcm16Stats(pcm);
+    speaker.logger.info(
+      `[voice-translate] wrote debug audio dump user=${speaker.userId} path=${path} bytes=${pcm.length} rms=${rms.toFixed(4)} peak=${peak.toFixed(4)}`,
+    );
+  } catch (error) {
+    speaker.logger.error(`[voice-translate] failed to write debug audio dump user=${speaker.userId} ${String(error)}`);
+  }
+}
+
+function debugDumpDir() {
+  return Deno.env.get("VOICE_TRANSLATE_DEBUG_DUMP_DIR")?.trim() || "";
+}
+
+function pcm16MonoToWav(pcm: Buffer, sampleRate: number) {
+  const header = Buffer.alloc(44);
+  header.write("RIFF", 0, "ascii");
+  header.writeUInt32LE(36 + pcm.length, 4);
+  header.write("WAVE", 8, "ascii");
+  header.write("fmt ", 12, "ascii");
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20);
+  header.writeUInt16LE(1, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(sampleRate * 2, 28);
+  header.writeUInt16LE(2, 32);
+  header.writeUInt16LE(16, 34);
+  header.write("data", 36, "ascii");
+  header.writeUInt32LE(pcm.length, 40);
+  return Buffer.concat([header, pcm]);
+}
+
+function safeFileComponent(value: string) {
+  return value.trim().replace(/[^a-zA-Z0-9_-]+/g, "_") || "unknown";
 }
 
 function translationWebSocketUrl() {
