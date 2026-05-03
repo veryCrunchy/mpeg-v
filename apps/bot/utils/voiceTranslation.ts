@@ -50,6 +50,7 @@ type VoiceRuntimeClient = UsingClient & {
 type SpeakerState = {
   userId: string;
   websocket: WebSocket;
+  logger: UsingClient["logger"];
   decoder?: prism.opus.Decoder;
   sequence: number;
   pcmQueue: Buffer[];
@@ -60,6 +61,7 @@ type SpeakerState = {
   decodedChunks: number;
   sentChunks: number;
   sentBytes: number;
+  queuedBytes: number;
   closed: boolean;
 };
 
@@ -295,6 +297,7 @@ async function subscribeSpeaker(
   const speaker: SpeakerState = {
     userId,
     websocket,
+    logger: client.logger,
     sequence: 0,
     pcmQueue: [],
     audioActive: false,
@@ -302,6 +305,7 @@ async function subscribeSpeaker(
     decodedChunks: 0,
     sentChunks: 0,
     sentBytes: 0,
+    queuedBytes: 0,
     closed: false,
   };
   session.speakers.set(userId, speaker);
@@ -328,10 +332,25 @@ async function subscribeSpeaker(
   });
 
   websocket.addEventListener("message", (event) => {
+    if (typeof event.data !== "string") {
+      client.logger.info(
+        `[voice-translate] whisper message user=${userId} non-text=${typeof event.data}`,
+      );
+      return;
+    }
+
     const payload = safeJson<TranslationPayload>(event.data);
+    if (!payload) {
+      client.logger.info(
+        `[voice-translate] whisper message user=${userId} unparsable=${event.data.slice(0, 160)}`,
+      );
+      return;
+    }
     const type = payload && "type" in payload ? String((payload as { type?: unknown }).type) : undefined;
     if (type && type !== "pong") {
-      client.logger.info(`[voice-translate] whisper message user=${userId} type=${type}`);
+      client.logger.info(
+        `[voice-translate] whisper message user=${userId} type=${type} body=${event.data.slice(0, 160)}`,
+      );
     }
     if (!payload?.isFinal) return;
     client.logger.info(`[voice-translate] final transcript user=${userId} text=${payload.text?.slice(0, 80) ?? ""}`);
@@ -422,22 +441,45 @@ function enqueuePcm(speaker: SpeakerState, chunk: Buffer) {
   if (!chunk.length) return;
 
   speaker.pcmQueue.push(chunk);
-  if (speaker.websocket.readyState !== WebSocket.OPEN) return;
+  speaker.queuedBytes += chunk.length;
+  if (speaker.websocket.readyState !== WebSocket.OPEN) {
+    if (speaker.pcmQueue.length === 1 || speaker.pcmQueue.length % 25 === 0) {
+      speaker.logger.info(
+        `[voice-translate] queue waiting user=${speaker.userId} readyState=${speaker.websocket.readyState} chunks=${speaker.pcmQueue.length} bytes=${speaker.queuedBytes}`,
+      );
+    }
+    return;
+  }
+
+  if (speaker.pcmQueue.length >= 5 || speaker.queuedBytes >= 10_000) {
+    flushPcm(speaker);
+    return;
+  }
+
   if (speaker.flushTimer) return;
 
   speaker.flushTimer = setTimeout(() => {
     speaker.flushTimer = undefined;
+    speaker.logger.info(
+      `[voice-translate] flush timer fired user=${speaker.userId} queued_chunks=${speaker.pcmQueue.length} queued_bytes=${speaker.queuedBytes}`,
+    );
     flushPcm(speaker);
-  }, 250);
+  }, 100);
 }
 
 function flushPcm(speaker: SpeakerState) {
   if (speaker.closed) return;
-  if (speaker.websocket.readyState !== WebSocket.OPEN) return;
+  if (speaker.websocket.readyState !== WebSocket.OPEN) {
+    speaker.logger.info(
+      `[voice-translate] flush skipped user=${speaker.userId} readyState=${speaker.websocket.readyState} queued_chunks=${speaker.pcmQueue.length} queued_bytes=${speaker.queuedBytes}`,
+    );
+    return;
+  }
   if (!speaker.pcmQueue.length) return;
 
   const pcm = Buffer.concat(speaker.pcmQueue);
   speaker.pcmQueue = [];
+  speaker.queuedBytes = 0;
   speaker.sentChunks++;
   speaker.sentBytes += pcm.length;
   speaker.websocket.send(JSON.stringify({
@@ -448,7 +490,7 @@ function flushPcm(speaker: SpeakerState) {
     data: pcm.toString("base64"),
   }));
   if (speaker.sentChunks === 1 || speaker.sentChunks % 20 === 0) {
-    console.log(
+    speaker.logger.info(
       `[voice-translate] sent pcm user=${speaker.userId} chunks=${speaker.sentChunks} bytes=${speaker.sentBytes} last_bytes=${pcm.length}`,
     );
   }
