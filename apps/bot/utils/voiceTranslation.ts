@@ -8,8 +8,12 @@ import type {
   GatewayVoiceStateUpdateDispatchData,
 } from "seyfert/lib/types/index.js";
 import type { UsingClient } from "seyfert";
+import type { TranslationSession } from "@mpeg-v/types";
 import prism from "prism-media";
-import { updateTranslationSession } from "utils/translationSessions.ts";
+import {
+  listTranslationSessions,
+  updateTranslationSession,
+} from "utils/translationSessions.ts";
 import {
   EndBehaviorType,
   entersState,
@@ -54,6 +58,7 @@ type VoiceRuntimeClient = UsingClient & {
   me?: { id?: string };
   calculateShardId(guildId: string): number;
   shards: Map<number, ShardRuntime>;
+  workerData?: { shards?: number[] };
 };
 
 type SpeakerState = {
@@ -317,6 +322,59 @@ export async function stopVoiceTranslation(guildId: string) {
 
 export function isVoiceTranslationRunning(guildId: string) {
   return sessions.has(guildId);
+}
+
+export async function resumeVoiceTranslationSessions(client: UsingClient) {
+  const voiceClient = client as VoiceRuntimeClient;
+  const stored = await listTranslationSessions();
+  const resumable = stored.filter(isResumableTranslationSession);
+
+  if (!resumable.length) {
+    client.logger.info("[voice-translate] no persisted sessions to resume");
+    return;
+  }
+
+  for (const session of resumable) {
+    if (sessions.has(session.guild_id)) continue;
+
+    const shardId = voiceClient.calculateShardId(session.guild_id);
+    const workerShards = voiceClient.workerData?.shards;
+    if (Array.isArray(workerShards) && !workerShards.includes(shardId)) {
+      continue;
+    }
+
+    try {
+      client.logger.info(
+        `[voice-translate] resuming persisted session guild=${session.guild_id} voice=${session.voice_channel_id} room=${session.room_id}`,
+      );
+      await updateTranslationSession(session.id, {
+        status: "starting",
+        status_message: "Bot restarted; resuming the Discord voice translation session.",
+      });
+      await startVoiceTranslation({
+        client,
+        guildId: session.guild_id,
+        voiceChannelId: session.voice_channel_id,
+        textChannelId: session.text_channel_id,
+        sourceLanguage: session.source_language || "auto",
+        targetLanguages: session.target_languages ?? [],
+        roomId: session.room_id || session.id,
+        sessionId: session.id,
+        publishToDiscord: Boolean(session.post_to_discord),
+      });
+    } catch (error) {
+      client.logger.error(error);
+      await updateTranslationSession(session.id, {
+        status: "failed",
+        status_message: `Could not resume after bot restart: ${error instanceof Error ? error.message : String(error)}`,
+      });
+    }
+  }
+}
+
+function isResumableTranslationSession(session: TranslationSession) {
+  if (!session.guild_id || !session.voice_channel_id || !session.text_channel_id) return false;
+  return !["stopped", "failed"].includes(session.status);
 }
 
 async function subscribeSpeaker(
@@ -691,13 +749,13 @@ async function publishDiscordTranscript(
   if (!session.publishToDiscord) return;
   const message = discordTranscriptMessage(session, speaker.userId, payload);
   if (!message) return;
-  const finalKey = payload.isFinal ? transcriptFinalKey(payload) : "";
+  const finalKeys = payload.isFinal ? transcriptFinalKeys(payload) : [];
 
-  if (payload.isFinal && message.hasTranslations && finalKey) {
-    const pendingMessageId = speaker.pendingFinalMessages?.get(finalKey);
+  if (payload.isFinal && message.hasTranslations && finalKeys.length) {
+    const pendingMessageId = firstPendingFinalMessage(speaker, finalKeys);
     if (pendingMessageId) {
       await editDiscordMessage(client, session, pendingMessageId, message.content);
-      speaker.pendingFinalMessages?.delete(finalKey);
+      deletePendingFinalMessages(speaker, finalKeys);
       return;
     }
     if (speaker.liveMessageId) {
@@ -733,7 +791,7 @@ async function publishDiscordTranscript(
     speaker.liveMessageStartedAt = Date.now();
     speaker.liveMessageLastEditAt = Date.now();
     speaker.liveMessageContext = message.contextText;
-    finishLiveMessage(speaker, payload, message, sent.id, finalKey);
+    finishLiveMessage(speaker, payload, message, sent.id, finalKeys);
     return;
   }
 
@@ -745,7 +803,7 @@ async function publishDiscordTranscript(
     clearPendingLiveEdit(speaker);
     await editLiveDiscordMessage(client, session, speaker, message.content);
     speaker.liveMessageContext = message.contextText;
-    finishLiveMessage(speaker, payload, message, speaker.liveMessageId, finalKey);
+    finishLiveMessage(speaker, payload, message, speaker.liveMessageId, finalKeys);
     return;
   }
 
@@ -803,15 +861,17 @@ function finishLiveMessage(
   payload: TranslationPayload,
   message: DiscordTranscriptMessage,
   messageId: string | undefined,
-  finalKey: string,
+  finalKeys: string[],
 ) {
   if (!payload.isFinal) return;
 
-  if (message.waitingForTranslation && messageId && finalKey) {
+  if (message.waitingForTranslation && messageId && finalKeys.length) {
     speaker.pendingFinalMessages ??= new Map();
-    speaker.pendingFinalMessages.set(finalKey, messageId);
+    for (const key of finalKeys) {
+      speaker.pendingFinalMessages.set(key, messageId);
+    }
     setTimeout(() => {
-      speaker.pendingFinalMessages?.delete(finalKey);
+      deletePendingFinalMessages(speaker, finalKeys);
     }, pendingFinalTranslationMs);
   }
 
@@ -855,7 +915,7 @@ function discordTranscriptMessage(
   if (isJunkTranscript(text)) return undefined;
 
   const hasDifferentTranslation = translations.some((item) => normalizeComparableText(item.text) !== normalizeComparableText(original));
-  const sourceLine = hasDifferentTranslation
+  const sourceLine = payload.isFinal || hasDifferentTranslation
     ? `\n-# ${original}${spokenAtSuffix(payload.spokenAt)}`
     : "";
   const content = clampDiscordContent(`<@${userId}>: ${text}${sourceLine}`);
@@ -889,11 +949,27 @@ function liveContextChange(previous: string, next: string): "same" | "extended" 
   return "new";
 }
 
-function transcriptFinalKey(payload: TranslationPayload): string {
-  if (typeof payload.sequence === "number") return `seq:${payload.sequence}`;
-  if (payload.spokenAt) return `spoken:${payload.spokenAt}`;
+function firstPendingFinalMessage(speaker: SpeakerState, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const messageId = speaker.pendingFinalMessages?.get(key);
+    if (messageId) return messageId;
+  }
+  return undefined;
+}
+
+function deletePendingFinalMessages(speaker: SpeakerState, keys: string[]) {
+  for (const key of keys) {
+    speaker.pendingFinalMessages?.delete(key);
+  }
+}
+
+function transcriptFinalKeys(payload: TranslationPayload): string[] {
+  const keys: string[] = [];
   const text = payload.fullText?.trim() || payload.text?.trim() || "";
-  return text ? `text:${normalizeComparableText(text).slice(0, 120)}` : "";
+  if (text) keys.push(`text:${normalizeComparableText(text).slice(0, 160)}`);
+  if (payload.spokenAt) keys.push(`spoken:${payload.spokenAt}`);
+  if (typeof payload.sequence === "number") keys.push(`seq:${payload.sequence}`);
+  return keys;
 }
 
 function clampDiscordContent(content: string): string {

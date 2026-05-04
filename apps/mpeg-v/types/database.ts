@@ -31,6 +31,7 @@ export interface TranslationSession {
   live_url: string;
   source_language: string;
   target_languages: string[];
+  post_to_discord?: boolean;
   status: "starting" | "connected" | "ready" | "degraded" | "stopped" | "failed" | "stale";
   status_message?: string;
   bot_instance_id: string;

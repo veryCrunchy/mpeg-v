@@ -99,6 +99,7 @@ export default class VoiceTranslateCommand extends Command {
         live_url: liveUrl,
         source_language: ctx.options.source ?? "auto",
         target_languages: targets,
+        post_to_discord: Boolean(ctx.options.post_to_discord),
         status: "starting",
         status_message: "Bot is joining the Discord voice channel.",
       });

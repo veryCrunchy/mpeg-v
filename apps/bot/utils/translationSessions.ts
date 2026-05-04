@@ -38,12 +38,22 @@ export async function updateTranslationSession(
   });
 }
 
+export async function listTranslationSessions(): Promise<TranslationSession[]> {
+  const response = await sessionRequest("/translation-sessions", {
+    method: "GET",
+  });
+  if (!response) return [];
+  const payload = await response.json() as { data?: TranslationSession[] } | TranslationSession[];
+  if (Array.isArray(payload)) return payload;
+  return Array.isArray(payload.data) ? payload.data : [];
+}
+
 async function sessionRequest(
   path: string,
-  init: { method: "POST" | "PATCH"; body: unknown },
+  init: { method: "GET"; body?: never } | { method: "POST" | "PATCH"; body: unknown },
 ) {
   const base = Deno.env.get("STREAM");
-  if (!base) return;
+  if (!base) return undefined;
 
   try {
     const response = await fetch(`${base}${path}`, {
@@ -53,7 +63,7 @@ async function sessionRequest(
         Accept: "application/json",
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(init.body),
+      body: init.method === "GET" ? undefined : JSON.stringify(init.body),
     });
 
     if (!response.ok) {
@@ -61,7 +71,9 @@ async function sessionRequest(
         `Session request failed: ${response.status} ${response.statusText}`,
       );
     }
+    return response;
   } catch (error) {
     console.error("Translation session tracking error:", error);
+    return undefined;
   }
 }
