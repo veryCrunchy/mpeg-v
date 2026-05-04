@@ -109,6 +109,7 @@ type Session = {
   roomId: string;
   publishToDiscord: boolean;
   heartbeatTimer?: number;
+  disconnectRecoveryActive?: boolean;
   speakerProfiles: Map<string, SpeakerProfile>;
 };
 
@@ -294,30 +295,69 @@ export async function startVoiceTranslation(options: {
   });
 
   connection.on(VoiceConnectionStatus.Disconnected, () => {
-    options.client.logger.warn(`[voice-translate] disconnected guild=${options.guildId}`);
-    void stopVoiceTranslation(options.guildId);
+    options.client.logger.warn(`[voice-translate] disconnected guild=${options.guildId}; waiting for voice reconnect`);
+    void recoverDisconnectedVoiceConnection(options.client, session, options.sessionId);
   });
 
   return session;
 }
 
-export async function stopVoiceTranslation(guildId: string) {
+export async function stopVoiceTranslation(
+  guildId: string,
+  options: { markStopped?: boolean } = {},
+) {
   const session = sessions.get(guildId);
   if (!session) return false;
 
   sessions.delete(guildId);
   console.log(`[voice-translate] stopping guild=${guildId}`);
   if (session.heartbeatTimer) clearInterval(session.heartbeatTimer);
-  void updateTranslationSession(session.roomId, {
-    status: "stopped",
-    status_message: "Voice translation stopped.",
-  });
+  if (options.markStopped ?? true) {
+    void updateTranslationSession(session.roomId, {
+      status: "stopped",
+      status_message: "Voice translation stopped.",
+    });
+  }
   for (const speaker of session.speakers.values()) {
     closeSpeaker(speaker);
   }
   session.connection.destroy();
   adapters.delete(guildId);
   return true;
+}
+
+async function recoverDisconnectedVoiceConnection(
+  client: UsingClient,
+  session: Session,
+  sessionId: string,
+) {
+  if (session.disconnectRecoveryActive) return;
+  session.disconnectRecoveryActive = true;
+
+  try {
+    await updateTranslationSession(sessionId, {
+      status: "degraded",
+      status_message: "Discord voice disconnected; waiting for automatic reconnect.",
+    });
+    await entersState(session.connection, VoiceConnectionStatus.Ready, 20_000);
+    session.disconnectRecoveryActive = false;
+    client.logger.info(`[voice-translate] voice reconnect recovered guild=${session.guildId}`);
+    await updateTranslationSession(sessionId, {
+      status: "ready",
+      status_message: "Discord voice receiver reconnected.",
+    });
+  } catch (error) {
+    session.disconnectRecoveryActive = false;
+    client.logger.warn(
+      `[voice-translate] voice reconnect failed guild=${session.guildId}; keeping persisted session resumable`,
+    );
+    client.logger.error(error);
+    await updateTranslationSession(sessionId, {
+      status: "degraded",
+      status_message: "Discord voice disconnected and did not reconnect automatically. The session remains resumable.",
+    });
+    await stopVoiceTranslation(session.guildId, { markStopped: false });
+  }
 }
 
 export function isVoiceTranslationRunning(guildId: string) {
