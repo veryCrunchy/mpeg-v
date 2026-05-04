@@ -801,6 +801,7 @@ async function publishDiscordTranscript(
     if (speaker.liveMessageId) {
       await client.messages.write(session.textChannelId, {
         content: message.content,
+        allowed_mentions: { parse: [] },
       });
       return;
     }
@@ -826,6 +827,7 @@ async function publishDiscordTranscript(
   if (!speaker.liveMessageId) {
     const sent = await client.messages.write(session.textChannelId, {
       content: message.content,
+      allowed_mentions: { parse: [] },
     });
     speaker.liveMessageId = sent.id;
     speaker.liveMessageStartedAt = Date.now();
@@ -893,6 +895,7 @@ async function editDiscordMessage(
 ) {
   await client.messages.edit(messageId, session.textChannelId, {
     content,
+    allowed_mentions: { parse: [] },
   });
 }
 
