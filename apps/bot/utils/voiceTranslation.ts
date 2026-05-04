@@ -27,6 +27,7 @@ type TranslationPayload = {
   fullText?: string;
   spokenAt?: string;
   language?: string;
+  sequence?: number;
   translations?: Record<string, string | {
     primary?: string;
     detectedLanguage?: string;
@@ -82,6 +83,7 @@ type SpeakerState = {
   liveMessageEditTimer?: number;
   liveMessageClearTimer?: number;
   liveMessagePublishQueue?: Promise<void>;
+  pendingFinalMessages?: Map<string, string>;
 };
 
 type SpeakerProfile = {
@@ -108,7 +110,7 @@ const sessions = new Map<string, Session>();
 
 const defaultWhisperUrl = "ws://127.0.0.1:8080/ws/transcribe";
 const liveMessageEditIntervalMs = 1_400;
-const liveMessageClearDelayMs = 12_000;
+const pendingFinalTranslationMs = 20_000;
 const discordContentLimit = 1_900;
 
 export function createSeyfertVoiceAdapter(
@@ -686,6 +688,22 @@ async function publishDiscordTranscript(
   if (!session.publishToDiscord) return;
   const message = discordTranscriptMessage(session, speaker.userId, payload);
   if (!message) return;
+  const finalKey = payload.isFinal ? transcriptFinalKey(payload) : "";
+
+  if (payload.isFinal && message.hasTranslations && finalKey) {
+    const pendingMessageId = speaker.pendingFinalMessages?.get(finalKey);
+    if (pendingMessageId) {
+      await editDiscordMessage(client, session, pendingMessageId, message.content);
+      speaker.pendingFinalMessages?.delete(finalKey);
+      return;
+    }
+    if (speaker.liveMessageId) {
+      await client.messages.write(session.textChannelId, {
+        content: message.content,
+      });
+      return;
+    }
+  }
 
   if (speaker.liveMessageClearTimer) {
     clearTimeout(speaker.liveMessageClearTimer);
@@ -698,7 +716,7 @@ async function publishDiscordTranscript(
     });
     speaker.liveMessageId = sent.id;
     speaker.liveMessageLastEditAt = Date.now();
-    scheduleLiveMessageClear(speaker, message.canClear);
+    finishLiveMessage(speaker, payload, message, sent.id, finalKey);
     return;
   }
 
@@ -709,7 +727,7 @@ async function publishDiscordTranscript(
   if (editNow) {
     clearPendingLiveEdit(speaker);
     await editLiveDiscordMessage(client, session, speaker, message.content);
-    scheduleLiveMessageClear(speaker, message.canClear);
+    finishLiveMessage(speaker, payload, message, speaker.liveMessageId, finalKey);
     return;
   }
 
@@ -742,9 +760,7 @@ async function editLiveDiscordMessage(
 ) {
   if (!speaker.liveMessageId) return;
   try {
-    await client.messages.edit(speaker.liveMessageId, session.textChannelId, {
-      content,
-    });
+    await editDiscordMessage(client, session, speaker.liveMessageId, content);
     speaker.liveMessageLastEditAt = Date.now();
   } catch (error) {
     speaker.liveMessageId = undefined;
@@ -753,21 +769,44 @@ async function editLiveDiscordMessage(
   }
 }
 
-function scheduleLiveMessageClear(speaker: SpeakerState, canClear: boolean) {
-  if (!canClear) {
-    speaker.liveMessageClearTimer = setTimeout(() => {
-      speaker.liveMessageId = undefined;
-      speaker.liveMessageLastEditAt = undefined;
-      clearPendingLiveEdit(speaker);
-      speaker.liveMessageClearTimer = undefined;
-    }, liveMessageClearDelayMs) as unknown as number;
-    return;
+async function editDiscordMessage(
+  client: UsingClient,
+  session: Session,
+  messageId: string,
+  content: string,
+) {
+  await client.messages.edit(messageId, session.textChannelId, {
+    content,
+  });
+}
+
+function finishLiveMessage(
+  speaker: SpeakerState,
+  payload: TranslationPayload,
+  message: DiscordTranscriptMessage,
+  messageId: string | undefined,
+  finalKey: string,
+) {
+  if (!payload.isFinal) return;
+
+  if (message.waitingForTranslation && messageId && finalKey) {
+    speaker.pendingFinalMessages ??= new Map();
+    speaker.pendingFinalMessages.set(finalKey, messageId);
+    setTimeout(() => {
+      speaker.pendingFinalMessages?.delete(finalKey);
+    }, pendingFinalTranslationMs);
   }
 
   speaker.liveMessageId = undefined;
   speaker.liveMessageLastEditAt = undefined;
   clearPendingLiveEdit(speaker);
 }
+
+type DiscordTranscriptMessage = {
+  content: string;
+  hasTranslations: boolean;
+  waitingForTranslation: boolean;
+};
 
 function discordTranscriptMessage(
   session: Session,
@@ -789,11 +828,18 @@ function discordTranscriptMessage(
     ? `\n-# ${original}${spokenAtSuffix(payload.spokenAt)}`
     : "";
   const content = clampDiscordContent(`<@${userId}>: ${text}${sourceLine}`);
-  const waitingForTranslation = payload.isFinal === true && session.targetLanguages.length > 0 && translations.length === 0;
   return {
     content,
-    canClear: payload.isFinal === true && !waitingForTranslation,
+    hasTranslations: translations.length > 0,
+    waitingForTranslation: payload.isFinal === true && session.targetLanguages.length > 0 && translations.length === 0,
   };
+}
+
+function transcriptFinalKey(payload: TranslationPayload): string {
+  if (typeof payload.sequence === "number") return `seq:${payload.sequence}`;
+  if (payload.spokenAt) return `spoken:${payload.spokenAt}`;
+  const text = payload.fullText?.trim() || payload.text?.trim() || "";
+  return text ? `text:${normalizeComparableText(text).slice(0, 120)}` : "";
 }
 
 function clampDiscordContent(content: string): string {
