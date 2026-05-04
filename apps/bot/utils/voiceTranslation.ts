@@ -22,6 +22,7 @@ import {
 
 type TranslationPayload = {
   text?: string;
+  fullText?: string;
   translations?: Record<string, string | {
     primary?: string;
     detectedLanguage?: string;
@@ -379,7 +380,7 @@ async function subscribeSpeaker(
       );
     }
     if (!payload?.isFinal) return;
-    client.logger.info(`[voice-translate] final transcript user=${userId} text=${payload.text?.slice(0, 80) ?? ""}`);
+    client.logger.info(`[voice-translate] final transcript user=${userId} text=${(payload.text || payload.fullText)?.slice(0, 80) ?? ""}`);
     void publishTranslation(client, session, userId, payload);
   });
 
@@ -650,13 +651,19 @@ async function publishTranslation(
   userId: string,
   payload: TranslationPayload,
 ) {
-  const text = firstTranslation(payload) ?? payload.text?.trim();
+  const translated = firstTranslation(payload);
+  if (session.targetLanguages.length > 0 && !translated) return;
+  const original = payload.fullText?.trim() || payload.text?.trim() || "";
+  const text = translated ?? payload.text?.trim() ?? payload.fullText?.trim();
   if (!text) return;
   if (isBlankAudioText(text)) return;
   if (!session.publishToDiscord) return;
 
+  const sourceLine = original && original !== text && !isBlankAudioText(original)
+    ? `\n-# ${original}`
+    : "";
   await client.messages.write(session.textChannelId, {
-    content: `<@${userId}>: ${text}`,
+    content: `<@${userId}>: ${text}${sourceLine}`,
   });
 }
 
