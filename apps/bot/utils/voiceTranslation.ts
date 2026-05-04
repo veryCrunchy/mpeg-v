@@ -78,7 +78,9 @@ type SpeakerState = {
   debugPcmChunks: Buffer[];
   dumpCount: number;
   liveMessageId?: string;
+  liveMessageStartedAt?: number;
   liveMessageLastEditAt?: number;
+  liveMessageContext?: string;
   liveMessagePendingContent?: string;
   liveMessageEditTimer?: number;
   liveMessageClearTimer?: number;
@@ -110,6 +112,7 @@ const sessions = new Map<string, Session>();
 
 const defaultWhisperUrl = "ws://127.0.0.1:8080/ws/transcribe";
 const liveMessageEditIntervalMs = 1_400;
+const liveMessageMaxAgeMs = 15_000;
 const pendingFinalTranslationMs = 20_000;
 const discordContentLimit = 1_900;
 
@@ -710,12 +713,26 @@ async function publishDiscordTranscript(
     speaker.liveMessageClearTimer = undefined;
   }
 
+  if (!payload.isFinal && liveMessageExpired(speaker)) {
+    clearActiveLiveMessage(speaker);
+  }
+
+  if (!payload.isFinal && speaker.liveMessageId && speaker.liveMessageContext) {
+    const contextChange = liveContextChange(speaker.liveMessageContext, message.contextText);
+    if (contextChange === "same") return;
+    if (contextChange === "new") {
+      clearActiveLiveMessage(speaker);
+    }
+  }
+
   if (!speaker.liveMessageId) {
     const sent = await client.messages.write(session.textChannelId, {
       content: message.content,
     });
     speaker.liveMessageId = sent.id;
+    speaker.liveMessageStartedAt = Date.now();
     speaker.liveMessageLastEditAt = Date.now();
+    speaker.liveMessageContext = message.contextText;
     finishLiveMessage(speaker, payload, message, sent.id, finalKey);
     return;
   }
@@ -727,11 +744,13 @@ async function publishDiscordTranscript(
   if (editNow) {
     clearPendingLiveEdit(speaker);
     await editLiveDiscordMessage(client, session, speaker, message.content);
+    speaker.liveMessageContext = message.contextText;
     finishLiveMessage(speaker, payload, message, speaker.liveMessageId, finalKey);
     return;
   }
 
   speaker.liveMessagePendingContent = message.content;
+  speaker.liveMessageContext = message.contextText;
   if (!speaker.liveMessageEditTimer) {
     const delay = Math.max(0, liveMessageEditIntervalMs - (Date.now() - (speaker.liveMessageLastEditAt ?? 0)));
     speaker.liveMessageEditTimer = setTimeout(() => {
@@ -763,8 +782,7 @@ async function editLiveDiscordMessage(
     await editDiscordMessage(client, session, speaker.liveMessageId, content);
     speaker.liveMessageLastEditAt = Date.now();
   } catch (error) {
-    speaker.liveMessageId = undefined;
-    speaker.liveMessageLastEditAt = undefined;
+    clearActiveLiveMessage(speaker);
     client.logger.error(error);
   }
 }
@@ -797,13 +815,26 @@ function finishLiveMessage(
     }, pendingFinalTranslationMs);
   }
 
+  clearActiveLiveMessage(speaker);
+}
+
+function liveMessageExpired(speaker: SpeakerState): boolean {
+  return !!speaker.liveMessageId &&
+    !!speaker.liveMessageStartedAt &&
+    Date.now() - speaker.liveMessageStartedAt >= liveMessageMaxAgeMs;
+}
+
+function clearActiveLiveMessage(speaker: SpeakerState) {
   speaker.liveMessageId = undefined;
+  speaker.liveMessageStartedAt = undefined;
   speaker.liveMessageLastEditAt = undefined;
+  speaker.liveMessageContext = undefined;
   clearPendingLiveEdit(speaker);
 }
 
 type DiscordTranscriptMessage = {
   content: string;
+  contextText: string;
   hasTranslations: boolean;
   waitingForTranslation: boolean;
 };
@@ -830,9 +861,32 @@ function discordTranscriptMessage(
   const content = clampDiscordContent(`<@${userId}>: ${text}${sourceLine}`);
   return {
     content,
+    contextText: original,
     hasTranslations: translations.length > 0,
     waitingForTranslation: payload.isFinal === true && session.targetLanguages.length > 0 && translations.length === 0,
   };
+}
+
+function liveContextChange(previous: string, next: string): "same" | "extended" | "new" {
+  const prev = normalizeComparableText(previous);
+  const current = normalizeComparableText(next);
+  if (!prev || !current) return "new";
+  if (prev === current) return "same";
+  if (current.length <= prev.length) return "new";
+  if (current.startsWith(prev)) return "extended";
+
+  const prevWords = prev.split(/\s+/).filter(Boolean);
+  const currentWords = current.split(/\s+/).filter(Boolean);
+  if (prevWords.length === 0 || currentWords.length <= prevWords.length) return "new";
+
+  const overlapLimit = Math.min(prevWords.length, currentWords.length);
+  for (let overlap = overlapLimit; overlap >= Math.min(3, overlapLimit); overlap--) {
+    const prevTail = prevWords.slice(-overlap).join(" ");
+    const currentHead = currentWords.slice(0, overlap).join(" ");
+    if (prevTail === currentHead) return "extended";
+  }
+
+  return "new";
 }
 
 function transcriptFinalKey(payload: TranslationPayload): string {
