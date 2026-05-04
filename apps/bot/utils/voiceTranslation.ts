@@ -26,6 +26,7 @@ type TranslationPayload = {
   text?: string;
   fullText?: string;
   spokenAt?: string;
+  language?: string;
   translations?: Record<string, string | {
     primary?: string;
     detectedLanguage?: string;
@@ -776,15 +777,19 @@ function discordTranscriptMessage(
   const original = payload.fullText?.trim() || payload.text?.trim() || "";
   if (isJunkTranscript(original)) return undefined;
 
-  const translated = firstTranslation(payload);
-  const text = translated ?? original;
-  if (!text || isJunkTranscript(text)) return undefined;
+  const translations = allTranslations(payload);
+  const lines = translations.length
+    ? translations.map((item) => `${item.lang.toUpperCase()}: ${item.text}`)
+    : [original];
+  const text = lines.join("\n");
+  if (isJunkTranscript(text)) return undefined;
 
-  const sourceLine = original && original !== text && !isJunkTranscript(original)
+  const hasDifferentTranslation = translations.some((item) => normalizeComparableText(item.text) !== normalizeComparableText(original));
+  const sourceLine = hasDifferentTranslation
     ? `\n-# ${original}${spokenAtSuffix(payload.spokenAt)}`
     : "";
   const content = clampDiscordContent(`<@${userId}>: ${text}${sourceLine}`);
-  const waitingForTranslation = payload.isFinal === true && session.targetLanguages.length > 0 && !translated;
+  const waitingForTranslation = payload.isFinal === true && session.targetLanguages.length > 0 && translations.length === 0;
   return {
     content,
     canClear: payload.isFinal === true && !waitingForTranslation,
@@ -803,25 +808,62 @@ function spokenAtSuffix(spokenAt: string | undefined): string {
   return ` · said <t:${Math.floor(ms / 1000)}:R>`;
 }
 
-function firstTranslation(payload: TranslationPayload) {
+function allTranslations(payload: TranslationPayload): Array<{ lang: string; text: string }> {
   const translations = payload.translations ?? {};
+  const items: Array<{ lang: string; text: string }> = [];
+  const seen = new Set<string>();
+  const original = payload.fullText?.trim() || payload.text?.trim() || "";
+  const originalLanguage = normalizeLanguageCode(payload.language);
+
   for (const lang of Object.keys(translations).sort()) {
+    const normalizedLang = normalizeLanguageCode(lang);
+    if (!normalizedLang || seen.has(normalizedLang)) continue;
+
     const value = translations[lang];
     if (typeof value === "string") {
       const text = value.trim();
-      if (text && !isJunkTranscript(text)) return text;
+      if (shouldUseTranslation(text, normalizedLang, originalLanguage, original)) {
+        seen.add(normalizedLang);
+        items.push({ lang: normalizedLang, text });
+      }
       continue;
     }
+
     if (value && typeof value === "object") {
       const primary = typeof value.primary === "string" ? value.primary.trim() : "";
-      if (primary && !isJunkTranscript(primary)) return primary;
       const alternative = Array.isArray(value.alternatives)
         ? value.alternatives.find((item) => typeof item === "string" && item.trim() && !isJunkTranscript(item))
         : undefined;
-      if (alternative) return alternative.trim();
+      const text = primary || alternative?.trim() || "";
+      if (shouldUseTranslation(text, normalizedLang, originalLanguage, original)) {
+        seen.add(normalizedLang);
+        items.push({ lang: normalizedLang, text });
+      }
     }
   }
-  return undefined;
+
+  return items;
+}
+
+function shouldUseTranslation(
+  text: string,
+  targetLanguage: string,
+  originalLanguage: string,
+  original: string,
+): boolean {
+  if (!text || isJunkTranscript(text)) return false;
+  if (targetLanguage && originalLanguage && targetLanguage === originalLanguage) {
+    return normalizeComparableText(text) !== normalizeComparableText(original);
+  }
+  return true;
+}
+
+function normalizeLanguageCode(value: string | undefined): string {
+  return (value ?? "").trim().toLowerCase().split(/[-_]/)[0] ?? "";
+}
+
+function normalizeComparableText(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 function isBlankAudioText(text: string): boolean {
