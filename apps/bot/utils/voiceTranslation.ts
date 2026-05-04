@@ -23,6 +23,7 @@ import {
 type TranslationPayload = {
   text?: string;
   fullText?: string;
+  spokenAt?: string;
   translations?: Record<string, string | {
     primary?: string;
     detectedLanguage?: string;
@@ -660,11 +661,18 @@ async function publishTranslation(
   if (!session.publishToDiscord) return;
 
   const sourceLine = original && original !== text && !isBlankAudioText(original)
-    ? `\n-# ${original}`
+    ? `\n-# ${original}${spokenAtSuffix(payload.spokenAt)}`
     : "";
   await client.messages.write(session.textChannelId, {
     content: `<@${userId}>: ${text}${sourceLine}`,
   });
+}
+
+function spokenAtSuffix(spokenAt: string | undefined): string {
+  if (!spokenAt) return "";
+  const ms = Date.parse(spokenAt);
+  if (!Number.isFinite(ms)) return "";
+  return ` · said <t:${Math.floor(ms / 1000)}:R>`;
 }
 
 function firstTranslation(payload: TranslationPayload) {
