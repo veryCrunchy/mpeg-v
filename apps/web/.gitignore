@@ -22,3 +22,6 @@ logs
 .env
 .env.*
 !.env.example
+# Copied from pinned npm packages for local media conversion.
+public/vendor/ffmpeg/
+public/vendor/pdfjs/

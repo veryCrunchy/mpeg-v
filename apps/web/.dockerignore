@@ -1,0 +1,10 @@
+node_modules
+.nuxt
+.output
+.data
+.env
+.env.*
+*.log
+coverage
+public/vendor/ffmpeg
+public/vendor/pdfjs

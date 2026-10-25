@@ -8,13 +8,17 @@ export function botInstanceId() {
   return INSTANCE_ID;
 }
 
+export function createTranslationSessionId() {
+  return crypto.randomUUID();
+}
+
 export async function createTranslationSession(
   session: Omit<
     TranslationSession,
     "bot_instance_id" | "date_created" | "date_updated"
   >,
 ) {
-  await sessionRequest("/translation-sessions", {
+  const response = await sessionRequest("/translation-sessions", {
     method: "POST",
     body: {
       ...session,
@@ -23,19 +27,29 @@ export async function createTranslationSession(
       date_updated: new Date().toISOString(),
     },
   });
+  if (!response && Deno.env.get("STREAM")) {
+    throw new Error(
+      "The translation session could not be saved. Try again later.",
+    );
+  }
+  await response?.body?.cancel().catch(() => {});
 }
 
 export async function updateTranslationSession(
   id: string,
   fields: Partial<TranslationSession>,
 ) {
-  await sessionRequest(`/translation-sessions/${encodeURIComponent(id)}`, {
-    method: "PATCH",
-    body: {
-      ...fields,
-      date_updated: new Date().toISOString(),
+  const response = await sessionRequest(
+    `/translation-sessions/${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      body: {
+        ...fields,
+        date_updated: new Date().toISOString(),
+      },
     },
-  });
+  );
+  await response?.body?.cancel().catch(() => {});
 }
 
 export async function listTranslationSessions(): Promise<TranslationSession[]> {
@@ -43,14 +57,19 @@ export async function listTranslationSessions(): Promise<TranslationSession[]> {
     method: "GET",
   });
   if (!response) return [];
-  const payload = await response.json() as { data?: TranslationSession[] } | TranslationSession[];
+  const payload = await response.json() as
+    | { data?: TranslationSession[] }
+    | TranslationSession[];
   if (Array.isArray(payload)) return payload;
   return Array.isArray(payload.data) ? payload.data : [];
 }
 
 async function sessionRequest(
   path: string,
-  init: { method: "GET"; body?: never } | { method: "POST" | "PATCH"; body: unknown },
+  init: { method: "GET"; body?: never } | {
+    method: "POST" | "PATCH";
+    body: unknown;
+  },
 ) {
   const base = Deno.env.get("STREAM");
   if (!base) return undefined;
@@ -64,9 +83,11 @@ async function sessionRequest(
         "Content-Type": "application/json",
       },
       body: init.method === "GET" ? undefined : JSON.stringify(init.body),
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!response.ok) {
+      await response.body?.cancel();
       throw new Error(
         `Session request failed: ${response.status} ${response.statusText}`,
       );

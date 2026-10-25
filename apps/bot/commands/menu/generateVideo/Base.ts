@@ -4,8 +4,10 @@ import {
   MessageCommandInteraction,
 } from "seyfert";
 import { filterAudioFiles, generateVideo } from "utils/generateVideo.ts";
+import { MessageFlags } from "seyfert/lib/types/index.js";
 
 export class GenerateVideoBase extends ContextMenuCommand {
+  protected privateReply = false;
   async run(ctx: MenuCommandContext<MessageCommandInteraction>) {
     const files = ctx.target.attachments;
 
@@ -16,7 +18,6 @@ export class GenerateVideoBase extends ContextMenuCommand {
     }
 
     const filteredFiles = filterAudioFiles(files);
-    if (!filteredFiles) return;
 
     for (const file of filteredFiles) {
       const [attachment, res] = await generateVideo(
@@ -26,13 +27,21 @@ export class GenerateVideoBase extends ContextMenuCommand {
       );
 
       const conversionTime = res.headers.get("Conversion-Time");
-      console.log(ctx.interaction);
-      return ctx.editOrReply({
+      const reply = {
         content: `\`${file.filename}\` ${ctx.target.url}\n-# Completed in ${
           Number(conversionTime) / 1000
         } seconds`,
         files: [attachment],
-      });
+        allowed_mentions: { parse: [] },
+      };
+      if (file === filteredFiles[0]) {
+        await ctx.editOrReply(reply);
+      } else {
+        await ctx.interaction.followup({
+          ...reply,
+          flags: this.privateReply ? MessageFlags.Ephemeral : undefined,
+        });
+      }
     }
   }
 }

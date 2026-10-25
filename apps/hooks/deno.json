@@ -2,8 +2,5 @@
   "tasks": {
     "dev": "deno run --env-file --allow-net --allow-env --watch main.ts",
     "start": "deno run --env-file --allow-net --allow-env main.ts"
-  },
-  "imports": {
-    "@std/crypto": "jsr:@std/crypto@^1.0.3"
   }
 }

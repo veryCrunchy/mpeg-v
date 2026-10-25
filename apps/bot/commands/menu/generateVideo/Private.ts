@@ -12,15 +12,9 @@ import { ApplicationCommandType } from "seyfert/lib/types/index.js";
   type: ApplicationCommandType.Message,
 })
 export default class GenerateVideoPrivate extends GenerateVideoBase {
+  protected override privateReply = true;
   override async run(ctx: MenuCommandContext<MessageCommandInteraction>) {
     await ctx.deferReply(true);
     return super.run(ctx);
   }
 }
-
-@Declare({
-  name: "Generate Video",
-  integrationTypes: ["GuildInstall", "UserInstall"],
-  type: ApplicationCommandType.Message,
-})
-export class GenerateVideoPublic extends GenerateVideoBase { }

@@ -1,16 +1,13 @@
 import { ConversionLogs, GenerateVideoRequest } from "@mpeg-v/types";
 import { Authorization, determineSizeLimit } from "@mpeg-v/utils";
-import {
-  AttachmentBuilder,
-  Message,
-  MessageCommandInteraction,
-} from "seyfert";
+import { AttachmentBuilder, Message, MessageCommandInteraction } from "seyfert";
 import { ALLOWED_EXTENSIONS } from "utils/general.ts";
 import { CommandContext, MenuCommandContext } from "seyfert";
+import type { AudioVideoSettings } from "../../web/utils/core/audioVideo.ts";
 
 export function filterAudioFiles<T extends { filename: string }>(
   files: T[],
-): T[] | null {
+): T[] {
   const filteredFiles = files.filter((file) => {
     return isValidAudioFile(file.filename);
   });
@@ -27,9 +24,8 @@ export function filterAudioFiles<T extends { filename: string }>(
 }
 
 export function isValidAudioFile(filename: string): boolean {
-  const extension = filename.split(".").pop();
-  console.log(extension, filename)
-  return ALLOWED_EXTENSIONS.includes(extension!);
+  const extension = filename.match(/\.([^.]+)$/)?.[1]?.toLowerCase();
+  return ALLOWED_EXTENSIONS.includes(extension ?? "");
 }
 
 export function formatFileSize(size: number): string {
@@ -46,9 +42,16 @@ export async function generateVideo(
   file: { filename: string; url: string; id: string },
   ctx: CommandContext | MenuCommandContext<MessageCommandInteraction> | Message,
   type: ConversionLogs["type"],
+  audioVideo?: Partial<AudioVideoSettings>,
 ): Promise<[AttachmentBuilder, Response]> {
-  const extension = file.filename.split(".").pop()!;
-  const guild = await ctx.guild();
+  const extension = file.filename.split(".").pop()!.toLowerCase();
+  const guild = ctx.guildId ? await ctx.guild() : undefined;
+  const discordLimit = ctx instanceof Message
+    ? undefined
+    : ctx.interaction?.attachmentSizeLimit;
+  const outputLimit = Number.isInteger(discordLimit) && discordLimit! > 0
+    ? Math.min(discordLimit!, 100 * 1024 * 1024)
+    : determineSizeLimit(guild?.premiumTier || 0);
 
   let date_created;
   if (ctx instanceof Message) {
@@ -68,8 +71,12 @@ export async function generateVideo(
       file_name: file.filename,
     },
     tier_limit: guild?.premiumTier || 0,
+    max_output_bytes: outputLimit,
+    actor: { userId: ctx.author.id, guildId: ctx.guildId },
+    audioVideo,
   };
   const res = await fetch(Deno.env.get("STREAM") + "/generate", {
+    signal: AbortSignal.timeout(130_000),
     headers: {
       "Content-Type": "application/json",
       Authorization,
@@ -78,15 +85,19 @@ export async function generateVideo(
     body: JSON.stringify(data),
   });
 
+  if (res.status === 429) {
+    await res.body?.cancel();
+    throw new Error("All converters are busy. Please try again shortly.");
+  }
+
   if (res.status == 413) {
+    await res.body?.cancel();
     throw new Error(
-      "File size is too large",
+      "Audio is too long or the converted video is too large",
       {
-        cause: `File size exceeds ${
+        cause: `Audio must be at most 15 minutes and the output must fit ${
           guild ? "this guilds" : "discords"
-        } upload limit of \`${
-          determineSizeLimit(guild?.premiumTier || 0) / 1024 / 1024
-        }MB\``,
+        } upload limit of \`${outputLimit / 1024 / 1024}MB\``,
       }, //TODO: Promote Pro Plan
     );
   }
@@ -100,6 +111,7 @@ export async function generateVideo(
 
     return [attachment, res];
   } else {
+    await res.body?.cancel();
     throw new Error("Failed to generate video", {
       cause: res.statusText,
     });
