@@ -1,5 +1,7 @@
 {
   "tasks": {
+    "test": "deno test --allow-env --allow-run --allow-read --allow-write apps/serve/converter_test.ts apps/serve/fileTools_test.ts apps/serve/preferences_test.ts apps/serve/translationSessions_test.ts apps/hooks/verify_test.ts apps/bot/tests/audio_test.ts apps/bot/tests/fileCommands_test.ts apps/bot/tests/settings_test.ts apps/bot/tests/translationSession_test.ts",
+    "build:web": "docker build -t mpeg-v-web apps/web",
     "build:bot": "docker build -t mpeg-v-bot -f apps/bot/Dockerfile .",
     "build:hooks": "docker build -t mpeg-v-hooks -f apps/hooks/Dockerfile apps/hooks",
     "build:serve": "docker build -t mpeg-v-serve -f apps/serve/Dockerfile ."
@@ -13,5 +15,9 @@
   ],
   "exclude": [
     "./apps/web"
-  ]
+  ],
+  "imports": {
+    "pdf-lib": "npm:pdf-lib@1.17.1",
+    "fflate": "npm:fflate@0.8.3"
+  }
 }

@@ -13,7 +13,10 @@ import {
   startVoiceTranslation,
   stopVoiceTranslation,
 } from "utils/voiceTranslation.ts";
-import { createTranslationSession } from "utils/translationSessions.ts";
+import {
+  createTranslationSession,
+  createTranslationSessionId,
+} from "utils/translationSessions.ts";
 
 const options = {
   action: createStringOption({
@@ -57,7 +60,9 @@ export default class VoiceTranslateCommand extends Command {
     if (ctx.options.action === "stop") {
       const stopped = await stopVoiceTranslation(ctx.guildId);
       return ctx.write({
-        content: stopped ? "Voice translation stopped." : "Voice translation is not running.",
+        content: stopped
+          ? "Voice translation stopped."
+          : "Voice translation is not running.",
         flags: MessageFlags.Ephemeral,
       });
     }
@@ -88,8 +93,10 @@ export default class VoiceTranslateCommand extends Command {
     await ctx.deferReply(true);
 
     try {
-      const sessionId = createSessionId(ctx.guildId, voice.channelId);
-      const liveUrl = `${translatePublicUrl()}/discord/${encodeURIComponent(sessionId)}`;
+      const sessionId = createTranslationSessionId();
+      const liveUrl = `${translatePublicUrl()}/discord/${
+        encodeURIComponent(sessionId)
+      }`;
       await createTranslationSession({
         id: sessionId,
         guild_id: ctx.guildId,
@@ -116,7 +123,9 @@ export default class VoiceTranslateCommand extends Command {
       });
 
       return ctx.editOrReply({
-        content: `Voice translation started for <#${voice.channelId}> -> ${targets.join(", ")}.\nLive captions: ${liveUrl}`,
+        content: `Voice translation started for <#${voice.channelId}> -> ${
+          targets.join(", ")
+        }.\nLive captions: ${liveUrl}`,
       });
     } catch (error) {
       await stopVoiceTranslation(ctx.guildId);
@@ -129,14 +138,9 @@ export default class VoiceTranslateCommand extends Command {
   }
 }
 
-function createSessionId(guildId: string, channelId: string) {
-  const suffix = crypto.randomUUID?.().slice(0, 8) ??
-    Math.random().toString(36).slice(2, 10);
-  return `${guildId}-${channelId}-${suffix}`;
-}
-
 function translatePublicUrl() {
-  return (Deno.env.get("TRANSLATE_PUBLIC_URL") ?? "https://translate.obiente.org")
+  return (Deno.env.get("TRANSLATE_PUBLIC_URL") ??
+    "https://translate.obiente.org")
     .replace(/\/+$/, "");
 }
 

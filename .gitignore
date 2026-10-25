@@ -1,15 +1,23 @@
 # weights that no dev can lift
 node_modules
 
-# lock
-yarn.lock
-package-lock.json
-deno.lock
-pnpm-lock.yaml
+# Generated output and local verification
+.nuxt/
+.output/
+.data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite-journal
+.translation-sessions-*.tmp
+coverage/
+*.log
 
 # env
 *.env
 */.env
+.env.*
+!.env.example
 
 # Seyfert command cache
 apps/bot/commands.json

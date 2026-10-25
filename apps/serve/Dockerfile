@@ -1,21 +1,16 @@
-FROM jrottenberg/ffmpeg:4.4-scratch AS ffmpeg
-
 FROM denoland/deno:2.7.7
-
-COPY --from=ffmpeg /bin/ffmpeg /bin/ffprobe /usr/local/bin/
-COPY --from=ffmpeg /lib /lib
-COPY --from=ffmpeg /share /share
-
-# RUN apk update && apk upgrade && \
-#     apk add --no-cache ffmpeg ffmpeg-libs libgcc && \
-#     rm -f /usr/local/lib/libgcc_s.so.1 && \
-#     apk add --no-cache libgcc
-
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-
-COPY apps/mpeg-v ./apps/mpeg-v 
+COPY deno.json deno.lock ./
+# Workspace manifests must be available when resolving the shared packages.
+COPY apps/bot/deno.json ./apps/bot/deno.json
+COPY apps/hooks/deno.json ./apps/hooks/deno.json
+COPY apps/mpeg-v ./apps/mpeg-v
 COPY apps/serve ./apps/serve
-
+COPY apps/web/utils/core ./apps/web/utils/core
+RUN deno cache apps/serve/main.ts apps/serve/fileJob.worker.ts
+RUN mkdir -p /app/apps/serve/.data && chown deno:deno /app/apps/serve/.data
+USER deno
 EXPOSE 3000
-
-CMD ["run","--allow-net","--allow-run","--allow-sys","--allow-read","--allow-write","--allow-env","apps/serve/main.ts"]
+CMD ["run", "--allow-net", "--allow-run=ffmpeg,ffprobe", "--allow-read", "--allow-write", "--allow-env", "apps/serve/main.ts"]

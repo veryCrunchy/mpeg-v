@@ -1,24 +1,14 @@
-# Build stage
-FROM denoland/deno:alpine-2.7.7 AS build
-
+FROM node:24.19.0-bookworm-slim AS build
 WORKDIR /app
-
+COPY package.json package-lock.json ./
+RUN npm ci --ignore-scripts
 COPY . .
+RUN npm run postinstall && npm run build
 
-RUN sed '2i "nodeModulesDir": "auto",' deno.json > deno.json.tmp && mv deno.json.tmp deno.json
-RUN deno install
-RUN deno task postinstall
-RUN deno task build
-
-# Runtime stage
-FROM denoland/deno:alpine-2.7.7
-
+FROM node:24.19.0-bookworm-slim
 WORKDIR /app
-
-COPY --from=build /app /app
-
-USER deno
-
+ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000
+COPY --from=build --chown=node:node /app/.output ./.output
+USER node
 EXPOSE 3000
-
-CMD ["run","--allow-net","--allow-read","--allow-env",".output/server/index.mjs"]
+CMD ["node", ".output/server/index.mjs"]

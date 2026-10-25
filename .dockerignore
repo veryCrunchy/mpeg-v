@@ -1,0 +1,11 @@
+.git
+**/node_modules
+**/.nuxt
+**/.output
+**/.data
+**/.env
+**/.env.*
+**/*.log
+**/coverage
+apps/web/public/vendor/ffmpeg
+apps/web/public/vendor/pdfjs

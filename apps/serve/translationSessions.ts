@@ -1,103 +1,61 @@
 import type { TranslationSession } from "@mpeg-v/types";
+import { isAuthorized } from "@mpeg-v/utils";
+import { errorResponse, HttpError, readJson } from "./http.ts";
+import {
+  sessionFile,
+  TranslationSessionStore,
+} from "./translationSessionStore.ts";
 
-type SessionPatch = Partial<TranslationSession> & { id?: string };
+export function createTranslationSessionsHandler(
+  store: TranslationSessionStore,
+) {
+  return async (req: Request, url: URL): Promise<Response> => {
+    // Metadata and live caption URLs are private service data, including reads.
+    // Check before loading storage or parsing the body to avoid existence leaks.
+    if (!isAuthorized(req)) return json({ error: "Unauthorized." }, 401);
+    try {
+      const collection = url.pathname === "/translation-sessions";
+      const match = url.pathname.match(/^\/translation-sessions\/([^/]+)$/);
+      if (!collection && !match) throw new HttpError(404, "Not found.");
+      const id = match?.[1];
 
-const sessions = new Map<string, TranslationSession>();
-let loaded = false;
-
-export async function handleTranslationSessions(req: Request, url: URL) {
-  await loadSessions();
-
-  const id = url.pathname.match(/^\/translation-sessions\/([^/]+)$/)?.[1];
-
-  if (url.pathname === "/translation-sessions" && req.method === "POST") {
-    const body = await req.json() as TranslationSession;
-    if (!body.id) return json({ error: "id is required" }, 400);
-
-    const now = new Date().toISOString();
-    const session: TranslationSession = {
-      ...body,
-      date_created: body.date_created ?? now,
-      date_updated: now,
-    };
-    sessions.set(session.id, session);
-    await saveSessions();
-    return json(session, 201);
-  }
-
-  if (id && req.method === "PATCH") {
-    const existing = sessions.get(id);
-    if (!existing) return json({ error: "session not found" }, 404);
-
-    const patch = await req.json() as SessionPatch;
-    const updated: TranslationSession = {
-      ...existing,
-      ...patch,
-      id: existing.id,
-      date_updated: new Date().toISOString(),
-    };
-    sessions.set(id, updated);
-    await saveSessions();
-    return json(updated);
-  }
-
-  if (id && req.method === "GET") {
-    const existing = sessions.get(id);
-    if (!existing) return json({ error: "session not found" }, 404);
-    return json(withComputedStatus(existing));
-  }
-
-  if (url.pathname === "/translation-sessions" && req.method === "GET") {
-    const items = [...sessions.values()].map(withComputedStatus);
-    return json({ data: items });
-  }
-
-  return undefined;
-}
-
-async function loadSessions() {
-  if (loaded) return;
-  loaded = true;
-
-  const path = Deno.env.get("TRANSLATION_SESSIONS_FILE");
-  if (!path) return;
-
-  try {
-    const items = JSON.parse(
-      await Deno.readTextFile(path),
-    ) as TranslationSession[];
-    for (const item of items) {
-      if (item.id) sessions.set(item.id, item);
+      if (collection && req.method === "POST") {
+        return json(await store.create(await readJson(req)), 201);
+      }
+      if (id && req.method === "PATCH") {
+        return json(await store.update(id, await readJson(req)));
+      }
+      if (id && req.method === "GET") {
+        const session = await store.get(id);
+        if (!session) throw new HttpError(404, "Session not found.");
+        return json(withComputedStatus(session));
+      }
+      if (collection && req.method === "GET") {
+        return json({ data: (await store.list()).map(withComputedStatus) });
+      }
+      return new Response(null, {
+        status: 405,
+        headers: {
+          "Cache-Control": "no-store",
+          Allow: collection ? "GET, POST" : "GET, PATCH",
+        },
+      });
+    } catch (error) {
+      return errorResponse(error);
     }
-  } catch (error) {
-    if (!(error instanceof Deno.errors.NotFound)) {
-      console.error("Failed to load translation sessions:", error);
-    }
-  }
+  };
 }
 
-async function saveSessions() {
-  const path = Deno.env.get("TRANSLATION_SESSIONS_FILE");
-  if (!path) return;
-
-  try {
-    const parent = path.split("/").slice(0, -1).join("/");
-    if (parent) await Deno.mkdir(parent, { recursive: true });
-    await Deno.writeTextFile(
-      path,
-      JSON.stringify([...sessions.values()], null, 2),
-    );
-  } catch (error) {
-    console.error("Failed to save translation sessions:", error);
-  }
-}
+const path = Deno.env.get("TRANSLATION_SESSIONS_FILE")?.trim();
+export const handleTranslationSessions = createTranslationSessionsHandler(
+  new TranslationSessionStore(path ? sessionFile(path) : undefined),
+);
 
 function withComputedStatus(session: TranslationSession): TranslationSession {
   const updatedAt = new Date(session.date_updated ?? session.date_created ?? 0)
     .getTime();
   if (
-    Number.isFinite(updatedAt) &&
-    Date.now() - updatedAt > 45_000 &&
+    Number.isFinite(updatedAt) && Date.now() - updatedAt > 45_000 &&
     !["stopped", "failed", "stale"].includes(session.status)
   ) {
     return {
@@ -110,12 +68,8 @@ function withComputedStatus(session: TranslationSession): TranslationSession {
 }
 
 function json(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), {
+  return Response.json(data, {
     status,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Cache-Control": "no-store",
-      "Content-Type": "application/json",
-    },
+    headers: { "Cache-Control": "no-store" },
   });
 }
